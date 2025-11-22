@@ -1,5 +1,6 @@
 from ml.tfidf_pipeline import TfidfPipeline
 
+
 def test_fit_predict_basic():
     model = TfidfPipeline()
     texts = ["starbucks coffee", "mcdonalds burger"]
@@ -10,9 +11,15 @@ def test_fit_predict_basic():
 
     assert out["label"] in ["Coffee", "FastFood"]
 
+
 def test_partial_fit_updates_label():
     model = TfidfPipeline()
-    model.fit(["dummy"], ["A"])
+
+    # Use at least TWO classes to avoid sklearn crash
+    model.fit(
+        ["dummy text one", "dummy text two"],
+        ["A", "B"]
+    )
 
     before = model.predict(["xyz"])[0]["label"]
 
@@ -20,3 +27,4 @@ def test_partial_fit_updates_label():
     after = model.predict(["xyz"])[0]["label"]
 
     assert after == "B"
+

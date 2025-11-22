@@ -6,7 +6,7 @@ import seaborn as sns
 from ml.tfidf_pipeline import TfidfPipeline
 from ml.data_pipeline import normalize_series
 
-def evaluate(model_dir="saved_models/tfidf", test_csv="data/GHCI_clean.csv"):
+def evaluate(model_dir="saved_models/tfidf", test_csv="data/test.csv"):
     df = pd.read_csv(test_csv)
     texts = normalize_series(df["transaction_text"]).tolist()
     labels = df["category"].tolist()
