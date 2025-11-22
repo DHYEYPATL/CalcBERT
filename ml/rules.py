@@ -1,7 +1,4 @@
-"""
-Rule-based classification for transaction categorization.
-Provides high-confidence predictions based on keyword matching.
-"""
+
 
 import re
 from typing import Dict, Any, List, Optional
@@ -80,17 +77,7 @@ RULES = {
 
 
 def apply_rules(text: str, meta: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-    """
-    Apply rule-based classification to transaction text.
-    
-    Args:
-        text: Transaction description text
-        meta: Optional metadata (not used currently)
-        
-    Returns:
-        Dictionary with label, confidence, and matches if rule matched,
-        None if no rule matched
-    """
+   
     if not text:
         return None
     
@@ -117,23 +104,12 @@ def apply_rules(text: str, meta: Optional[Dict[str, Any]] = None) -> Optional[Di
 
 
 def get_all_categories() -> List[str]:
-    """
-    Get list of all categories covered by rules.
     
-    Returns:
-        List of category names
-    """
     return list(RULES.keys())
 
 
 def add_rule(category: str, pattern: str) -> None:
-    """
-    Add a new rule pattern to a category.
     
-    Args:
-        category: Category name
-        pattern: Regex pattern to match
-    """
     if category not in RULES:
         RULES[category] = []
     RULES[category].append(pattern)

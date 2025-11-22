@@ -31,7 +31,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup_event():
-    """Initialize database and models on startup."""
+    
     print("=" * 60)
     print("CalcBERT Backend Starting...")
     print("=" * 60)
@@ -51,7 +51,7 @@ def startup_event():
 
 @app.on_event("shutdown")
 def shutdown_event():
-    """Cleanup on shutdown."""
+    
     print("CalcBERT Backend shutting down...")
 
 
@@ -63,7 +63,7 @@ app.include_router(retrain.router, prefix="", tags=["Retrain"])
 
 @app.get("/", tags=["Root"])
 def root():
-    """Root endpoint with API information."""
+    
     return {
         "name": settings.API_TITLE,
         "version": settings.API_VERSION,
@@ -81,7 +81,7 @@ def root():
 
 @app.get("/health", tags=["System"])
 def health():
-    """Health check endpoint."""
+   
     return {
         "status": "ok",
         "service": "CalcBERT Backend",
@@ -91,10 +91,7 @@ def health():
 
 @app.get("/metrics", tags=["System"])
 def metrics():
-    """
-    Get model metrics.
-    Returns metrics from the saved metrics file if available.
-    """
+    
     metrics_path = "metrics/tfidf_metrics.json"
     
     if os.path.exists(metrics_path):

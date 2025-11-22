@@ -120,7 +120,7 @@ class ModelAdapter:
                 return fused
             except Exception as e:
                 print(f"Fusion error: {e}, falling back to simple merge")
-        # ... fallback logic (optional)
+       
 
         if rule_output and ml_output:
             
@@ -128,7 +128,7 @@ class ModelAdapter:
                 final_label = rule_output["label"]
                 final_confidence = rule_output["confidence"]
             else:
-                # Otherwise use ML
+                
                 final_label = ml_output.get("label")
                 final_confidence = ml_output.get("confidence", 0.0)
             
@@ -142,7 +142,7 @@ class ModelAdapter:
                 "model_used": f"{model_used}_with_rules"
             }
         elif rule_output:
-            # Only rules available
+            
             fused = {
                 "label": rule_output["label"],
                 "confidence": rule_output.get("confidence", 0.95),
@@ -153,7 +153,7 @@ class ModelAdapter:
                 "model_used": "rules_only"
             }
         else:
-            # Only ML available
+            
             fused = {
                 "label": ml_output.get("label"),
                 "confidence": ml_output.get("confidence", 0.0),
@@ -167,13 +167,7 @@ class ModelAdapter:
         return fused
     
     def reload_tfidf_model(self) -> bool:
-        """
-        Reload the TF-IDF model from disk.
-        Call this after retraining to use the updated model.
         
-        Returns:
-            True if reload successful, False otherwise
-        """
         tfidf_path = settings.TFIDF_MODEL_DIR
         try:
             from ml.tfidf_pipeline import TfidfPipeline
@@ -191,12 +185,7 @@ class ModelAdapter:
             return False
     
     def get_model_status(self) -> Dict[str, bool]:
-        """
-        Get the status of all loaded models.
         
-        Returns:
-            Dictionary with model availability status
-        """
         return {
             "tfidf": self.tfidf is not None,
             "distilbert": self.distil is not None,

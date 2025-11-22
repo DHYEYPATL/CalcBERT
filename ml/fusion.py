@@ -1,10 +1,9 @@
 def fuse(rule_output, ml_output, tfidf_output, weights=None):
-    # Example weighting and thresholds
+    
     weights = weights or {"rule": 0.6, "ml": 0.3, "tfidf": 0.1}
     RULE_HIGH_CONF = 0.9
-    TFIDF_HIGH_CONF = 0.10  # Lowered for demo: TF-IDF wins more easily after retrain
-
-    # 1. Prefer rule if highly confident
+    TFIDF_HIGH_CONF = 0.10  
+    
     if rule_output and rule_output.get("confidence", 0) >= RULE_HIGH_CONF:
         final = rule_output.copy()
         final["model_used"] = "rule"
@@ -16,7 +15,7 @@ def fuse(rule_output, ml_output, tfidf_output, weights=None):
         }
         return final
 
-    # 2. If TF-IDF is highly confident (post-correction/retrain), prefer it
+    
     if tfidf_output and tfidf_output.get("confidence", 0) >= TFIDF_HIGH_CONF:
         final = tfidf_output.copy()
         final["model_used"] = "tfidf"
@@ -28,7 +27,7 @@ def fuse(rule_output, ml_output, tfidf_output, weights=None):
         }
         return final
 
-    # 3. Otherwise, fallback to ML (DistilBERT)
+    
     if ml_output:
         final = ml_output.copy()
         final["model_used"] = "distilbert"
@@ -40,5 +39,4 @@ def fuse(rule_output, ml_output, tfidf_output, weights=None):
         }
         return final
 
-    # 4. Fallback to rule_output or unknown label
     return rule_output or {"label": "Unknown", "confidence": 0.0, "rationale": {}, "model_used": "none"}

@@ -25,7 +25,7 @@ def cluster_merchants(merchants):
             if j in used or j == i:
                 continue
 
-            # Better similarity for messy text
+            
             if fuzz.token_sort_ratio(base, merchants[j]) >= 80:
                 cluster.append(merchants[j])
                 used.add(j)
@@ -36,12 +36,12 @@ def cluster_merchants(merchants):
     return clusters
 
 def pick_canonical(cluster):
-    # Prefer strings without numbers
+    
     clean_candidates = [c for c in cluster if not re.search(r"\d", c)]
     if clean_candidates:
         cluster = clean_candidates
 
-    # pick longest clean representative
+    
     return sorted(cluster, key=lambda x: (-len(x), x))[0]
 
 def generate_map(csv_path="data/GHCI_clean.csv"):
@@ -50,7 +50,7 @@ def generate_map(csv_path="data/GHCI_clean.csv"):
     merchants_raw = df["transaction_text"].fillna("").astype(str).tolist()
     cleaned = [clean_text(t) for t in merchants_raw]
 
-    # FIX → use full cleaned merchant strings
+  
     merchants_unique = list(set(cleaned))
 
     clusters = cluster_merchants(merchants_unique)

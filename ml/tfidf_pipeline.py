@@ -4,7 +4,7 @@ from sklearn.preprocessing import LabelEncoder
 import joblib
 import os
 import numpy as np
-from scipy.special import expit  # sigmoid
+from scipy.special import expit 
 
 class TfidfPipeline:
     def __init__(self, max_features=5000):
@@ -58,14 +58,14 @@ class TfidfPipeline:
     def partial_fit(self, texts, labels):
         X = self.vectorizer.transform(texts)
     
-    # Only keep labels that already exist in the label encoder
+    
         existing_labels = [label for label in labels if label in self.le.classes_]
         if not existing_labels:
-            return 0  # nothing to update
+            return 0  
 
         y = self.le.transform(existing_labels)
     
-    # Incremental update without specifying 'classes' (use existing)
+    
         self.clf.partial_fit(X[:len(y)], y)
         self._is_fitted = True
         return len(y)

@@ -1,7 +1,3 @@
-"""
-API Performance Benchmarking Script
-Measures latency and throughput of the CalcBERT backend.
-"""
 
 import time
 import requests
@@ -67,7 +63,7 @@ def benchmark_predict(n_requests: int = 100) -> Dict[str, Any]:
     
     total_time = time.time() - start_time
     
-    # Calculate statistics
+    
     if latencies:
         results = {
             "total_requests": n_requests,
@@ -96,7 +92,7 @@ def benchmark_predict(n_requests: int = 100) -> Dict[str, Any]:
 
 
 def print_results(results: Dict[str, Any]) -> None:
-    """Print benchmark results in a readable format."""
+    
     print(f"\n{'='*60}")
     print("BENCHMARK RESULTS")
     print(f"{'='*60}\n")
@@ -124,7 +120,7 @@ def print_results(results: Dict[str, Any]) -> None:
 
 
 def test_endpoint_availability() -> bool:
-    """Test if the backend is available."""
+    
     try:
         response = requests.get(f"{BASE_URL}/health", timeout=5)
         if response.status_code == 200:
@@ -140,10 +136,10 @@ def test_endpoint_availability() -> bool:
 
 
 def main():
-    """Main benchmark function."""
+    
     print("\nCalcBERT Backend Performance Benchmark")
     
-    # Check if backend is available
+    
     if not test_endpoint_availability():
         print("\nPlease start the backend server first:")
         print("  cd backend")

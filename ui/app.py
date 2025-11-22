@@ -1,4 +1,4 @@
-# ui/app.py
+
 import sys
 import os
 import time
@@ -6,7 +6,7 @@ import streamlit as st
 import requests
 from datetime import datetime
 
-# ---------- Setup ----------
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -16,7 +16,7 @@ from ml.tfidf_pipeline import TfidfPipeline
 
 BACKEND_URL = "http://localhost:8000"
 
-# ---------- Helpers ----------
+
 def get_health():
     try:
         r = requests.get(f"{BACKEND_URL}/health", timeout=2.0)
@@ -29,7 +29,7 @@ def get_health():
     except Exception as e:
         return "red", str(e)
 
-@st.cache_data(ttl=300)  # Cache for 5 minutes
+@st.cache_data(ttl=300)  
 def fetch_categories():
     """Fetch categories from backend API (more reliable than loading model file)."""
     try:
@@ -39,18 +39,18 @@ def fetch_categories():
         if data.get("status") == "ok":
             return data.get("categories", [])
         else:
-            # Fallback: load from model file if API fails
+           
             pipeline = TfidfPipeline()
             pipeline.load("saved_models/tfidf")
             return list(pipeline.le.classes_)
     except Exception as e:
-        # Fallback: load from model file if API fails
+        
         try:
             pipeline = TfidfPipeline()
             pipeline.load("saved_models/tfidf")
             return list(pipeline.le.classes_)
         except:
-            # Last resort: return empty list
+            
             return []
 
 def call_predict(text: str):
@@ -71,7 +71,7 @@ def call_retrain(mode="incremental", model="tfidf"):
     r.raise_for_status()
     return r.json()
 
-# ---------- Session State ----------
+
 if "session_transactions" not in st.session_state:
     st.session_state.session_transactions = []
 
@@ -81,12 +81,12 @@ if "last_predicted" not in st.session_state:
 if "last_prediction_result" not in st.session_state:
     st.session_state.last_prediction_result = None
 
-# ---------- UI Layout ----------
+
 st.set_page_config(page_title="CalcBERT — Offline Transaction Categoriser", layout="wide")
 st.title("CalcBERT — Offline Transaction Categoriser")
 st.caption("Input a messy transaction → see predicted category + confidence + explanation → correct & retrain")
 
-# Health
+
 health_color, health_msg = get_health()
 health_label = f"Backend: {BACKEND_URL} — {health_msg}"
 if health_color == "green":
@@ -94,7 +94,7 @@ if health_color == "green":
 else:
     st.error(health_label)
 
-# Columns
+
 left, right = st.columns([2, 1])
 
 with left:
@@ -120,7 +120,7 @@ with left:
                     st.error(f"Predict failed: {e}")
                     resp = None
 
-    # Display last prediction if available
+   
     resp = st.session_state.last_prediction_result
     if resp:
         category = resp.get("category", "Unknown")
@@ -187,9 +187,9 @@ with right:
                 retr = call_retrain(mode="full", model="tfidf")
                 if retr.get("status") == "complete":
                     st.success(f"✓ Retrain completed: {retr.get('details')}")
-                    # Clear cache to force reload of categories
+                    
                     fetch_categories.clear()
-                    # Show category info
+                    
                     cat_count = retr.get("categories_trained", 0)
                     if cat_count > 0:
                         st.info(f"✓ Model now has {cat_count} categories")
@@ -197,7 +197,7 @@ with right:
                             st.write("**Categories:**", ", ".join(retr.get("categories_list", [])))
                     else:
                         st.warning("⚠ Could not determine category count from response")
-                    # Force UI refresh by updating session state
+                    
                     st.rerun()
                 else:
                     st.warning(f"Retrain status: {retr.get('status')} - {retr.get('details')}")
@@ -207,7 +207,7 @@ with right:
                 st.code(traceback.format_exc())
 
     if st.button("Reload categories"):
-        # Clear cache first
+        
         fetch_categories.clear()
         cats = fetch_categories()
         st.success(f"Loaded {len(cats)} categories")

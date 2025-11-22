@@ -1,6 +1,3 @@
-"""
-Prediction endpoint - handles transaction categorization requests.
-"""
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -8,14 +5,14 @@ from typing import Optional, Dict, Any
 import sys
 import os
 
-# Add parent directory to path
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from backend.model_adapter import ModelAdapter
 
 router = APIRouter()
 
-# Initialize model adapter once at module load
+
 try:
     adapter = ModelAdapter()
     print("Model adapter initialized successfully")
@@ -25,7 +22,7 @@ except Exception as e:
 
 
 class PredictRequest(BaseModel):
-    """Request schema for prediction endpoint."""
+    
     text: str = Field(..., description="Transaction description text", min_length=1)
     meta: Optional[Dict[str, Any]] = Field(None, description="Optional metadata (MCC, time, etc.)")
     
@@ -39,7 +36,7 @@ class PredictRequest(BaseModel):
 
 
 class PredictResponse(BaseModel):
-    """Response schema for prediction endpoint."""
+    
     category: str = Field(..., description="Predicted category")
     confidence: float = Field(..., description="Confidence score (0-1)")
     explanation: Dict[str, Any] = Field(..., description="Explanation with rule hits and top tokens")
@@ -48,18 +45,7 @@ class PredictResponse(BaseModel):
 
 @router.post("/predict", response_model=PredictResponse)
 def predict(req: PredictRequest) -> PredictResponse:
-    """
-    Predict the category for a transaction.
     
-    Args:
-        req: PredictRequest with text and optional metadata
-        
-    Returns:
-        PredictResponse with category, confidence, and explanation
-        
-    Raises:
-        HTTPException: If prediction fails
-    """
     if adapter is None:
         raise HTTPException(
             status_code=503,
@@ -67,10 +53,10 @@ def predict(req: PredictRequest) -> PredictResponse:
         )
     
     try:
-        # Call model adapter
+        
         fused = adapter.predict(req.text, req.meta)
         
-        # Format response
+        
         return PredictResponse(
             category=fused["label"],
             confidence=fused["confidence"],
@@ -86,12 +72,7 @@ def predict(req: PredictRequest) -> PredictResponse:
 
 @router.get("/model-status")
 def get_model_status() -> Dict[str, Any]:
-    """
-    Get the status of loaded models.
     
-    Returns:
-        Dictionary with model availability information
-    """
     if adapter is None:
         return {
             "status": "error",
@@ -116,12 +97,7 @@ def get_model_status() -> Dict[str, Any]:
 
 @router.get("/categories")
 def get_categories() -> Dict[str, Any]:
-    """
-    Get all available categories from the TF-IDF model.
     
-    Returns:
-        Dictionary with categories list and status
-    """
     if adapter is None or adapter.tfidf is None:
         return {
             "status": "error",
@@ -130,7 +106,7 @@ def get_categories() -> Dict[str, Any]:
         }
     
     try:
-        # Get categories from the label encoder
+        
         categories = list(adapter.tfidf.le.classes_)
         return {
             "status": "ok",

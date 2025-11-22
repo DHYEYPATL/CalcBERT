@@ -11,9 +11,8 @@ DEMO_CASES = [
     "BIGBASKET GROCERIES 4321"
 ]
 
-# Optional: mapping of index -> correction label to simulate user corrections in demo
+
 DEMO_CORRECTIONS = {
-    # case index: correct label
-    2: "Fuel",               # HP PUMP PETROL => Fuel
-    5: "Shopping",           # Amazon marketplace
-}
+    
+    2: "Fuel",              
+    5: "Shopping",           

@@ -1,8 +1,3 @@
-"""
-SQLite storage for feedback data.
-Provides functions to initialize database, save feedback, and retrieve samples.
-"""
-
 import sqlite3
 import time
 from typing import List, Tuple, Optional
@@ -12,11 +7,7 @@ DB_PATH = "backend/backend_feedback.db"
 
 
 def init_db() -> None:
-    """
-    Initialize the feedback database.
-    Creates the feedback table if it doesn't exist.
-    """
-    # Ensure backend directory exists
+    
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = sqlite3.connect(DB_PATH)
@@ -36,17 +27,7 @@ def init_db() -> None:
 
 
 def save_feedback(text: str, correct_label: str, user_id: Optional[str] = None) -> int:
-    """
-    Save user feedback to the database.
     
-    Args:
-        text: The transaction text
-        correct_label: The correct category label
-        user_id: Optional user identifier
-        
-    Returns:
-        The ID of the inserted feedback record
-    """
     ts = int(time.time())
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -61,15 +42,7 @@ def save_feedback(text: str, correct_label: str, user_id: Optional[str] = None) 
 
 
 def get_feedback_samples(limit: Optional[int] = None) -> List[Tuple[int, str, str]]:
-    """
-    Retrieve feedback samples from the database.
     
-    Args:
-        limit: Optional limit on number of samples to retrieve
-        
-    Returns:
-        List of tuples (id, text, correct_label)
-    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     q = "SELECT id, text, correct_label FROM feedback ORDER BY created_at ASC"
@@ -82,12 +55,7 @@ def get_feedback_samples(limit: Optional[int] = None) -> List[Tuple[int, str, st
 
 
 def get_feedback_count() -> int:
-    """
-    Get the total count of feedback samples.
     
-    Returns:
-        Number of feedback records in the database
-    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT COUNT(*) FROM feedback")
@@ -97,10 +65,7 @@ def get_feedback_count() -> int:
 
 
 def clear_feedback() -> None:
-    """
-    Clear all feedback from the database.
-    Use with caution - this deletes all stored feedback.
-    """
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM feedback")
@@ -110,15 +75,7 @@ def clear_feedback() -> None:
 
 
 def get_recent_feedback(hours: int = 24) -> List[Tuple[int, str, str, int]]:
-    """
-    Get feedback from the last N hours.
     
-    Args:
-        hours: Number of hours to look back
-        
-    Returns:
-        List of tuples (id, text, correct_label, created_at)
-    """
     cutoff = int(time.time()) - (hours * 3600)
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
