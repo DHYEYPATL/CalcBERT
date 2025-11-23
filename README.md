@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧮 CalcBERT
+# 🧮 CalcBERT by Team Finovators
 
 ### **AI-Powered Offline Transaction Categorization System**
 
@@ -412,7 +412,7 @@ pytest tests/test_api.py
 
 ## 📚 **Documentation**
 
-- 📖 **[Complete Pipeline Overview](PIPELINE_OVERVIEW.md)** — Detailed architecture documentation
+- 📖 **[Complete Pipeline Overview](Pipeline.md)** — Detailed architecture documentation
 - 🔧 **[API Documentation](http://localhost:8000/docs)** — Interactive Swagger UI (when running)
 - 🎥 **[Demo Video](https://www.youtube.com/watch?v=D1xVbAkiwuo)** — Full walkthrough
 
@@ -439,9 +439,7 @@ pytest tests/test_api.py
 
 ---
 
-## 📝 **License**
 
-This project is licensed under the MIT License — see the LICENSE file for details.
 
 ---
 
