@@ -85,31 +85,9 @@ CalcBERT automatically categorizes these into meaningful groups like "Coffee & B
 
 ---
 
-## 📊 **Performance Metrics**
-
-Our TF-IDF model achieves **perfect 100% accuracy** across all 13 categories:
-
-<div align="center">
-
-| Category | Precision | Recall | F1-Score | Test Samples |
-|:---------|:---------:|:------:|:--------:|:------------:|
-| ☕ Coffee & Beverages | **1.00** | **1.00** | **1.00** | 382 |
-| 🍔 Fast Food | **1.00** | **1.00** | **1.00** | 380 |
-| 🍕 Food Delivery | **1.00** | **1.00** | **1.00** | 439 |
-| 🛒 Groceries | **1.00** | **1.00** | **1.00** | 406 |
-| 🚗 Transport | **1.00** | **1.00** | **1.00** | 372 |
-| 🎬 Entertainment | **1.00** | **1.00** | **1.00** | 401 |
-| 🏥 Healthcare | **1.00** | **1.00** | **1.00** | 385 |
-| ⛽ Fuel | **1.00** | **1.00** | **1.00** | 385 |
-| 👕 Clothing & Apparel | **1.00** | **1.00** | **1.00** | 321 |
-| 🏋️ Fitness | **1.00** | **1.00** | **1.00** | 395 |
-| ✈️ Travel | **1.00** | **1.00** | **1.00** | 365 |
-| 💳 Wallet | **1.00** | **1.00** | **1.00** | 372 |
-| 🛍️ Online Shopping | **1.00** | **1.00** | **1.00** | 397 |
-| | | | | |
-| **📈 OVERALL** | **1.00** | **1.00** | **1.00** | **5000** |
-
-</div>
+- ✅ **Strong Precision** with 84% macro average (low false positives)
+- 🎯 **Balanced F1-Score** of 73% demonstrates robust classification
+- � **Test Coverage** across 32 real-world transaction samples
 
 ---
 
