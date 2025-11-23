@@ -283,29 +283,7 @@ POST /predict
 
 ---
 
-## 🎓 **Supported Categories**
 
-CalcBERT recognizes **13 transaction categories**:
-
-<div align="center">
-
-| Category | Examples |
-|:---------|:---------|
-| ☕ **Coffee & Beverages** | Starbucks, Cafe Coffee Day, Tea shops |
-| 🍔 **Fast Food** | McDonald's, KFC, Burger King |
-| 🍕 **Food Delivery** | Swiggy, Zomato, UberEats |
-| 🛒 **Groceries** | Supermarkets, DMart, BigBasket |
-| 🚗 **Transport** | Uber, Ola, Metro, Bus |
-| 🎬 **Entertainment** | Movies, Netflix, Gaming |
-| 🏥 **Healthcare** | Hospitals, Pharmacies, Clinics |
-| ⛽ **Fuel** | Petrol pumps, Gas stations |
-| 👕 **Clothing & Apparel** | Fashion stores, Clothing brands |
-| 🏋️ **Fitness** | Gyms, Sports equipment |
-| ✈️ **Travel** | Airlines, Hotels, Booking sites |
-| 💳 **Wallet** | Paytm, PhonePe, Digital wallets |
-| 🛍️ **Online Shopping** | Amazon, Flipkart, E-commerce |
-
-</div>
 
 ---
 
