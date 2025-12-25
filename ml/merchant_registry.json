@@ -1,0 +1,130 @@
+{
+    "swiggy": {
+        "verified": true,
+        "type": "food_delivery"
+    },
+    "zomato": {
+        "verified": true,
+        "type": "food_delivery"
+    },
+    "uber": {
+        "verified": true,
+        "type": "transport"
+    },
+    "ola": {
+        "verified": true,
+        "type": "transport"
+    },
+    "rapido": {
+        "verified": true,
+        "type": "transport"
+    },
+    "airbnb": {
+        "verified": true,
+        "type": "travel"
+    },
+    "booking_com": {
+        "verified": true,
+        "type": "travel"
+    },
+    "makemytrip": {
+        "verified": true,
+        "type": "travel"
+    },
+    "goibibo": {
+        "verified": true,
+        "type": "travel"
+    },
+    "netflix": {
+        "verified": true,
+        "type": "subscription"
+    },
+    "amazon_prime": {
+        "verified": true,
+        "type": "subscription"
+    },
+    "spotify": {
+        "verified": true,
+        "type": "subscription"
+    },
+    "hotstar": {
+        "verified": true,
+        "type": "subscription"
+    },
+    "youtube_premium": {
+        "verified": true,
+        "type": "subscription"
+    },
+    "amazon": {
+        "verified": true,
+        "type": "ecommerce"
+    },
+    "flipkart": {
+        "verified": true,
+        "type": "ecommerce"
+    },
+    "myntra": {
+        "verified": true,
+        "type": "ecommerce"
+    },
+    "ajio": {
+        "verified": true,
+        "type": "ecommerce"
+    },
+    "google_pay": {
+        "verified": true,
+        "type": "payment"
+    },
+    "phonepe": {
+        "verified": true,
+        "type": "payment"
+    },
+    "paytm": {
+        "verified": true,
+        "type": "payment"
+    },
+    "bhim_upi": {
+        "verified": true,
+        "type": "payment"
+    },
+    "blinkit": {
+        "verified": true,
+        "type": "grocery_delivery"
+    },
+    "zepto": {
+        "verified": true,
+        "type": "grocery_delivery"
+    },
+    "bigbasket": {
+        "verified": true,
+        "type": "grocery_delivery"
+    },
+    "instamart": {
+        "verified": true,
+        "type": "grocery_delivery"
+    },
+    "urban_company": {
+        "verified": true,
+        "type": "home_services"
+    },
+    "practo": {
+        "verified": true,
+        "type": "healthcare"
+    },
+    "apollo_247": {
+        "verified": true,
+        "type": "healthcare"
+    },
+    "linkedin": {
+        "verified": true,
+        "type": "professional_network"
+    },
+    "twitter_x": {
+        "verified": true,
+        "type": "social_media"
+    },
+    "instagram": {
+        "verified": true,
+        "type": "social_media"
+    }
+}
