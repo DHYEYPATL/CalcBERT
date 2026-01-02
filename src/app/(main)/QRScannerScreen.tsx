@@ -32,7 +32,7 @@ const handleScan = ({ data }: { data: string }) => {
     const upiId = url.searchParams.get('pa')
     const merchantName = url.searchParams.get('pn')
 
-    navigation.navigate('index', {
+    navigation.navigate('PaymentScreen', {
       merchantName: merchantName
         ? decodeURIComponent(merchantName)
         : 'Unknown Merchant',

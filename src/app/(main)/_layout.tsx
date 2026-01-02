@@ -10,6 +10,7 @@ const _layout = () => {
       <Stack.Screen name='QRScannerScreen'/>
       <Stack.Screen name='PaymentScreen'/>
       <Stack.Screen name='PrepayResultScreen'/>
+      <Stack.Screen name='SplitPaymentScreen' />
     </Stack>
   )
 }
