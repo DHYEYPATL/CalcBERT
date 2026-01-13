@@ -4,6 +4,7 @@ Provides centralized configuration for the FastAPI backend.
 """
 
 from typing import List
+from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
