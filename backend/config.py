@@ -54,6 +54,10 @@ class Settings(BaseSettings):
     UNIVERSAL_BLOCK_THRESHOLD: float = 200000.0
     UNVERIFIED_MERCHANT_WARN_THRESHOLD: float = 10000.0
     
+    # Mock Mode Configuration
+    CALCBERT_MODE: str = Field(default="production", env="CALCBERT_MODE")  # "mock" or "production"
+    ENABLE_MOCK_FALLBACK: bool = True  # Fallback to mock if models fail
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -1,0 +1,64 @@
+{
+  "tfidf_output": {
+    "label": "Restaurant & Dining",
+    "confidence": 0.85,
+    "top_tokens": ["swiggy", "dinner", "food"],
+    "splits": [
+      {"category": "Restaurant & Dining", "amount": 1200.0}
+    ],
+    "risk_flags": {
+      "uncertain_category": false,
+      "personal_vs_business_conflict": false,
+      "unknown_merchant": false,
+      "low_note_quality": false
+    },
+    "suggested_actions": []
+  },
+  "bert_output": {
+    "label": "Restaurant & Dining",
+    "confidence": 0.91,
+    "embedding": [0.1, 0.2, 0.3, 0.4, 0.5],
+    "splits": [
+      {"category": "Restaurant & Dining", "amount": 1200.0}
+    ]
+  },
+  "fusion_output": {
+    "decision": "allow",
+    "reason_codes": [],
+    "user_options": ["Continue"],
+    "final_category": "Restaurant & Dining",
+    "final_confidence": 0.88,
+    "explanation": {
+      "merchant_status": {"verified": true, "confidence": 0.95},
+      "split_rationale": [
+        {"category": "Restaurant & Dining", "trigger": "swiggy"}
+      ],
+      "top_tokens": ["swiggy", "dinner", "food"]
+    }
+  },
+  "prepay_response": {
+    "decision": "allow",
+    "options": ["Continue"],
+    "analysis": {
+      "final_category": "Restaurant & Dining",
+      "final_confidence": 0.88,
+      "risk_flags": {
+        "high_amount": false,
+        "unverified_merchant": false,
+        "low_quality_note": false,
+        "policy_violation": false
+      },
+      "explanation": {
+        "category_reason": "Categorized as 'Restaurant & Dining' based on keyword matching",
+        "policy_reason": "No policy restrictions apply.",
+        "suggestions": []
+      },
+      "subscription": {
+        "is_subscription": false,
+        "confidence": 0.0
+      },
+      "similar_expenses": []
+    },
+    "check_id": 1
+  }
+}
