@@ -30,8 +30,29 @@ class Settings(BaseSettings):
     
     # API configuration
     API_TITLE: str = "CalcBERT Backend"
-    API_VERSION: str = "1.0.0"
-    API_DESCRIPTION: str = "Offline hybrid rule+ML transaction categorizer"
+    API_VERSION: str = "2.0.0"
+    API_DESCRIPTION: str = "Offline hybrid rule+ML transaction categorizer with prepay policy engine"
+    
+    # v2 Backend: Pinecone Configuration
+    PINECONE_API_KEY: str = ""
+    PINECONE_ENVIRONMENT: str = "us-west1-gcp"
+    PINECONE_INDEX_NAME: str = "calcbert-expenses"
+    
+    # v2 Backend: Vector Store Configuration
+    VECTOR_DIMENSION: int = 384  # DistilBERT embedding dimension
+    VECTOR_METRIC: str = "cosine"
+    VECTOR_FALLBACK_PATH: str = "./backend/vector_store_fallback.pkl"
+    USE_PINECONE: bool = False  # Auto-detected based on API key
+    
+    # v2 Backend: LangGraph Workflow Configuration
+    LANGGRAPH_ENABLED: bool = False  # Set True if LangGraph is installed
+    WORKFLOW_MODE: str = "sequential"  # 'sequential' or 'langgraph'
+    
+    # v2 Backend: Policy Engine Configuration
+    EMPLOYEE_ALCOHOL_BLOCK: bool = True
+    EMPLOYEE_HIGH_AMOUNT_THRESHOLD: float = 50000.0
+    UNIVERSAL_BLOCK_THRESHOLD: float = 200000.0
+    UNVERIFIED_MERCHANT_WARN_THRESHOLD: float = 10000.0
     
     class Config:
         env_file = ".env"
@@ -40,3 +61,8 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+# Auto-detect Pinecone availability
+if settings.PINECONE_API_KEY:
+    settings.USE_PINECONE = True
+
