@@ -6,9 +6,9 @@ from ml.fusion import fuse
 distilbert = DistilBertWrapper("saved_models/distilbert")
 
 def distilbert_node(state: dict) -> dict:
-    
+  
     text = state.get("text", "")
-    state["bert_output"] = distilbert.predict([text])[0]  # returns dict
+    state["bert_output"] = distilbert.predict([text])[0]  
     return state
 
 def fusion_node(state: dict) -> dict:
@@ -23,6 +23,6 @@ def fusion_node(state: dict) -> dict:
 # Example additional nodes:
 def explanation_node(state: dict) -> dict:
     
-    # Already merged top_tokens & rule_hits in fusion rationale
+    
     state["explanation"] = state["final_decision"].get("rationale", {})
     return state
