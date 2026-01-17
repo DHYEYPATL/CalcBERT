@@ -7,7 +7,7 @@ import json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from backend.config import settings
-from backend.routes import predict, feedback, retrain
+from backend.routes import predict, feedback, retrain, prepay, summary
 from backend.storage import init_db
 
 
@@ -59,6 +59,8 @@ def shutdown_event():
 app.include_router(predict.router, prefix="", tags=["Prediction"])
 app.include_router(feedback.router, prefix="", tags=["Feedback"])
 app.include_router(retrain.router, prefix="", tags=["Retrain"])
+app.include_router(prepay.router, prefix="/prepay", tags=["Prepay v2"])
+app.include_router(summary.router, prefix="/summary", tags=["Summary & Analytics v2"])
 
 
 @app.get("/", tags=["Root"])
@@ -72,6 +74,12 @@ def root():
             "predict": "/predict",
             "feedback": "/feedback",
             "retrain": "/retrain",
+            "prepay_check": "/prepay/check",
+            "prepay_history": "/prepay/history",
+            "prepay_stats": "/prepay/stats",
+            "summary_today": "/summary/today",
+            "subscriptions": "/summary/subscriptions",
+            "alerts": "/summary/alerts",
             "health": "/health",
             "metrics": "/metrics",
             "docs": "/docs"
