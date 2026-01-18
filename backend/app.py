@@ -7,7 +7,7 @@ import json
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from backend.config import settings
-from backend.routes import predict, feedback, retrain, prepay, summary
+from backend.routes import predict, feedback, retrain, prepay, summary, splits
 from backend.storage import init_db
 
 
@@ -61,6 +61,7 @@ app.include_router(feedback.router, prefix="", tags=["Feedback"])
 app.include_router(retrain.router, prefix="", tags=["Retrain"])
 app.include_router(prepay.router, prefix="/prepay", tags=["Prepay v2"])
 app.include_router(summary.router, prefix="/summary", tags=["Summary & Analytics v2"])
+app.include_router(splits.router, prefix="/splits", tags=["Payment Splits"])
 
 
 @app.get("/", tags=["Root"])

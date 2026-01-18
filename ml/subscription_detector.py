@@ -8,20 +8,7 @@ def detect_subscription(
     amount_tolerance: float = 0.05,
     min_occurrences: int = 3
 ) -> dict:
-    """
-    Detect recurring subscription payments.
-
-    Assumes history_df has columns:
-    ['merchant', 'amount', 'date']
-
-    Returns:
-    {
-      "is_subscription": bool,
-      "period": "monthly" | "weekly" | None,
-      "count": int,
-      "reason": str
-    }
-    """
+   
 
     # Default response (defensive)
     result = {

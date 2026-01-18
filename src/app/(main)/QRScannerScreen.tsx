@@ -1,8 +1,8 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native'
-import React, { useEffect, useState } from 'react'
-import { CameraView, useCameraPermissions } from 'expo-camera'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
+import { CameraView, useCameraPermissions } from 'expo-camera'
+import { useEffect, useState } from 'react'
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 
 const QRScannerScreen = () => {
   const [permission, requestPermission] = useCameraPermissions()
@@ -13,6 +13,27 @@ const QRScannerScreen = () => {
     requestPermission()
   }, [])
 
+  const handleScan = ({ data }: { data: string }) => {
+    if (scanned) return
+    setScanned(true)
+
+    try {
+      const url = new URL(data)
+      const upiId = url.searchParams.get('pa')
+      const merchantName = url.searchParams.get('pn')
+
+      navigation.navigate('PaymentScreen', {
+        merchantName: merchantName
+          ? decodeURIComponent(merchantName)
+          : 'Unknown Merchant',
+        upiId: upiId ?? '',
+      })
+    } catch (err) {
+      console.log('Invalid QR')
+      navigation.goBack()
+    }
+  }
+
   if (!permission || !permission.granted) {
     return (
       <SafeAreaView style={styles.permission}>
@@ -22,27 +43,6 @@ const QRScannerScreen = () => {
       </SafeAreaView>
     )
   }
-
-const handleScan = ({ data }: { data: string }) => {
-  if (scanned) return
-  setScanned(true)
-
-  try {
-    const url = new URL(data)
-    const upiId = url.searchParams.get('pa')
-    const merchantName = url.searchParams.get('pn')
-
-    navigation.navigate('PaymentScreen', {
-      merchantName: merchantName
-        ? decodeURIComponent(merchantName)
-        : 'Unknown Merchant',
-      upiId: upiId ?? '',
-    })
-  } catch (err) {
-    console.log('Invalid QR')
-    navigation.goBack()
-  }
-}
 
   return (
     <SafeAreaView style={styles.container}>

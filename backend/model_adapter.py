@@ -24,16 +24,30 @@ class ModelAdapter:
         tfidf_path = settings.TFIDF_MODEL_DIR
         try:
             from ml.tfidf_pipeline import TfidfPipeline
-            p = TfidfPipeline()
             if os.path.exists(tfidf_path):
-                p.load(tfidf_path)
-                self.tfidf = p
-                print(f"✓ TF-IDF model loaded from {tfidf_path}")
+                # load() is a @classmethod that returns a new instance - must assign it!
+                self.tfidf = TfidfPipeline.load(tfidf_path)
+                # Verify the model is actually fitted
+                if hasattr(self.tfidf, '_is_fitted') and self.tfidf._is_fitted:
+                    # Test with a simple prediction to verify it works
+                    try:
+                        test_pred = self.tfidf.predict(["test"])
+                        print(f"✓ TF-IDF model loaded and verified from {tfidf_path}")
+                        print(f"  Test prediction successful, categories available: {len(self.tfidf.le.classes_) if hasattr(self.tfidf, 'le') else 'unknown'}")
+                    except Exception as test_e:
+                        print(f"⚠ TF-IDF loaded but test prediction failed: {test_e}")
+                        self.tfidf = None
+                else:
+                    print(f"⚠ TF-IDF loaded but _is_fitted=False or missing")
+                    self.tfidf = None
             else:
                 print(f"⚠ TF-IDF model directory not found: {tfidf_path}")
+                self.tfidf = None
         except Exception as e:
             self.tfidf = None
             print(f"⚠ TF-IDF load failed: {e}")
+            import traceback
+            print(traceback.format_exc())
         
         
         dist_path = settings.DISTILBERT_DIR
@@ -203,7 +217,7 @@ class ModelAdapter:
         Returns separate outputs from each model component.
         
         Args:
-            state: State dictionary with 'note' and optional 'meta'
+            state: State dictionary with 'note' and optional 'meta', 'merchant'
             
         Returns:
             Dictionary with:
@@ -213,7 +227,23 @@ class ModelAdapter:
                 "bert_output": {...} or None
             }
         """
-        text = state.get("note", "")
+        # Combine merchant + note for better categorization
+        merchant = state.get("merchant", "")
+        note = state.get("note", "")
+        
+        # Build prediction text: prefer combined, fallback to merchant if note is empty/garbled
+        if note and note.strip() and len(note.strip()) > 2:
+            # Combine merchant and note for better context
+            text = f"{merchant} {note}".strip()
+        else:
+            # Use merchant name if note is missing or too short
+            text = merchant.strip() or note.strip()
+        
+        # If still empty, set a default
+        if not text:
+            text = "unknown transaction"
+            print("⚠ Warning: Empty text for prediction, using default")
+        
         meta = state.get("meta", {})
         
         result = {
@@ -225,16 +255,35 @@ class ModelAdapter:
         # Get rule output
         if self.rules:
             try:
-                result["rule_output"] = self.rules.apply_rules(text, meta)
+                rule_result = self.rules.apply_rules(text, meta)
+                result["rule_output"] = rule_result
+                if rule_result:
+                    print(f"✓ Rules matched: {rule_result.get('label')} (confidence: {rule_result.get('confidence')})")
             except Exception as e:
                 print(f"Rule prediction error: {e}")
+                import traceback
+                print(traceback.format_exc())
         
         # Get TF-IDF output
         if self.tfidf:
             try:
-                result["tfidf_output"] = self.tfidf.predict([text])[0]
+                # Verify model is actually loaded
+                if not hasattr(self.tfidf, '_is_fitted') or not self.tfidf._is_fitted:
+                    print(f"⚠ TF-IDF model exists but _is_fitted={getattr(self.tfidf, '_is_fitted', 'MISSING')}")
+                else:
+                    tfidf_pred = self.tfidf.predict([text])[0]
+                    # TF-IDF returns "category", normalize to "label" for consistency with workflow
+                    if "category" in tfidf_pred and "label" not in tfidf_pred:
+                        tfidf_pred["label"] = tfidf_pred.get("category")
+                    result["tfidf_output"] = tfidf_pred
+                    if tfidf_pred.get("label"):
+                        print(f"✓ TF-IDF predicted: {tfidf_pred.get('label')} (confidence: {tfidf_pred.get('confidence')})")
+                    else:
+                        print(f"⚠ TF-IDF returned empty label for text: {text[:50]}")
             except Exception as e:
                 print(f"TF-IDF prediction error: {e}")
+                import traceback
+                print(traceback.format_exc())
         
         # Get DistilBERT output (optional)
         if self.distil:
@@ -299,37 +348,35 @@ class ModelAdapter:
             "suggestions": []
         }
     
-    def detect_merchant_type(self, merchant: str) -> str:
+    def detect_merchant_type(self, merchant: str, note: str = None) -> str:
         """
-        Detect merchant verification status.
+        Detect merchant verification status using merchant_registry.json.
+        Checks both merchant name and note text for merchant keywords.
         
         Args:
             merchant: Merchant name
+            note: Optional note text to check for merchant keywords
             
         Returns:
             'verified', 'known', or 'unknown'
         """
-        # List of verified/known merchants (in production, this would be a database)
-        verified_merchants = [
-            "swiggy", "zomato", "uber", "ola", "amazon", "flipkart",
-            "starbucks", "mcdonald", "dominos", "pizza hut",
-            "reliance", "big bazaar", "dmart", "more",
-            "irctc", "makemytrip", "goibibo", "oyo"
-        ]
-        
-        merchant_lower = merchant.lower()
-        
-        # Check if verified
-        for verified in verified_merchants:
-            if verified in merchant_lower:
+        try:
+            from ml.merchant_check import verify_merchant
+            result = verify_merchant(merchant, note)
+            
+            if result.get("verified"):
                 return "verified"
-        
-        # Check if it looks like a known pattern (has @upi, etc.)
-        if "@" in merchant_lower or "upi" in merchant_lower:
-            return "known"
-        
-        # Unknown merchant
-        return "unknown"
+            elif result.get("merchant_type"):
+                return "known"
+            else:
+                return "unknown"
+        except Exception as e:
+            print(f"⚠ Merchant verification error: {e}")
+            # Fallback: Check if it looks like a known pattern (has @upi, etc.)
+            merchant_lower = (merchant or "").lower()
+            if "@" in merchant_lower or "upi" in merchant_lower:
+                return "known"
+            return "unknown"
     
     def detect_subscription(
         self,

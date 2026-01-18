@@ -107,8 +107,8 @@ class WorkflowOrchestrator:
         amount = state.get("amount", 0.0)
         note = state.get("note", "")
         
-        # Detect merchant type
-        merchant_type = self.model_adapter.detect_merchant_type(merchant)
+        # Detect merchant type - pass note to help match merchant from note text
+        merchant_type = self.model_adapter.detect_merchant_type(merchant, note)
         
         # Detect subscription
         subscription_info = self.model_adapter.detect_subscription(merchant, amount, note)
@@ -126,15 +126,7 @@ class WorkflowOrchestrator:
         return state
     
     def _tfidf_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Node 2: TF-IDF category prediction.
         
-        Args:
-            state: Current state
-            
-        Returns:
-            Updated state with tfidf_output
-        """
         predictions = self.model_adapter.predict_structured(state)
         state["tfidf_output"] = predictions.get("tfidf_output")
         state["rule_output"] = predictions.get("rule_output")
@@ -142,30 +134,14 @@ class WorkflowOrchestrator:
         return state
     
     def _bert_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Node 3: DistilBERT category prediction (optional).
-        
-        Args:
-            state: Current state
-            
-        Returns:
-            Updated state with bert_output
-        """
+      
         predictions = self.model_adapter.predict_structured(state)
         state["bert_output"] = predictions.get("bert_output")
         
         return state
     
     def _policy_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Node 4: Policy engine check.
         
-        Args:
-            state: Current state
-            
-        Returns:
-            Updated state with policy_result
-        """
         user_role = state.get("user_role", "employee")
         amount = state.get("amount", 0.0)
         
@@ -200,18 +176,17 @@ class WorkflowOrchestrator:
         return state
     
     def _fusion_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Node 5: Fuse predictions and policy results.
         
-        Args:
-            state: Current state
-            
-        Returns:
-            Updated state with fusion_result
-        """
         rule_output = state.get("rule_output")
         tfidf_output = state.get("tfidf_output")
         bert_output = state.get("bert_output")
+        
+        # Debug logging
+        print(f"🔍 Fusion inputs - rule: {rule_output is not None}, tfidf: {tfidf_output is not None}, bert: {bert_output is not None}")
+        if rule_output:
+            print(f"   Rule output: {rule_output.get('label')} (conf: {rule_output.get('confidence')})")
+        if tfidf_output:
+            print(f"   TF-IDF output: {tfidf_output.get('label') or tfidf_output.get('category')} (conf: {tfidf_output.get('confidence')})")
         
         # Use fusion module if available
         if self.model_adapter.fusion:
@@ -223,49 +198,74 @@ class WorkflowOrchestrator:
         else:
             fused = self._fallback_fusion(rule_output, tfidf_output, bert_output)
         
+        print(f"✓ Fusion result: {fused.get('label')} (conf: {fused.get('confidence')}, model: {fused.get('model_used')})")
         state["fusion_result"] = fused
         
-        # Determine final decision based on policy
+       
         policy_result = state.get("policy_result", {})
         state["final_decision"] = policy_result.get("action", "allow")
         
         return state
     
     def _fallback_fusion(self, rule_output, tfidf_output, bert_output) -> Dict[str, Any]:
-        """
-        Fallback fusion logic when fusion module unavailable.
         
-        Returns:
-            Fused prediction
-        """
-        # Prefer rule if high confidence
+        
         if rule_output and rule_output.get("confidence", 0) >= 0.9:
-            return {
-                "label": rule_output["label"],
-                "confidence": rule_output["confidence"],
-                "model_used": "rule",
-                "rationale": {"rule_hits": rule_output.get("matches", [])}
-            }
+            label = rule_output.get("label")
+            if label and label != "Unknown":
+                return {
+                    "label": label,
+                    "confidence": rule_output.get("confidence", 0.9),
+                    "model_used": "rule",
+                    "rationale": {"rule_hits": rule_output.get("matches", [])}
+                }
         
-        # Otherwise prefer TF-IDF
+        
         if tfidf_output:
-            return {
-                "label": tfidf_output.get("label", "Unknown"),
-                "confidence": tfidf_output.get("confidence", 0.0),
-                "model_used": "tfidf",
-                "rationale": {"top_tokens": tfidf_output.get("top_tokens", [])}
-            }
+            # TF-IDF returns "category", not "label" - handle both
+            label = tfidf_output.get("label") or tfidf_output.get("category")
+            confidence = tfidf_output.get("confidence", 0.0)
+            # Only use if we have a valid prediction
+            if label and label != "Unknown" and confidence > 0:
+                return {
+                    "label": label,
+                    "confidence": confidence,
+                    "model_used": "tfidf",
+                    "rationale": {"top_tokens": tfidf_output.get("top_tokens", [])}
+                }
+            elif label:  # Even if confidence is low, return the label
+                return {
+                    "label": label,
+                    "confidence": max(confidence, 0.5),  # Minimum confidence for display
+                    "model_used": "tfidf",
+                    "rationale": {"top_tokens": tfidf_output.get("top_tokens", [])}
+                }
         
         # Fallback to bert
         if bert_output:
-            return {
-                "label": bert_output.get("label", "Unknown"),
-                "confidence": bert_output.get("confidence", 0.0),
-                "model_used": "bert",
-                "rationale": {}
-            }
+            label = bert_output.get("label")
+            if label and label != "Unknown":
+                return {
+                    "label": label,
+                    "confidence": bert_output.get("confidence", 0.0),
+                    "model_used": "bert",
+                    "rationale": {}
+                }
         
-        # No predictions available
+        # Try rule even if low confidence
+        if rule_output:
+            label = rule_output.get("label")
+            if label:
+                return {
+                    "label": label,
+                    "confidence": rule_output.get("confidence", 0.7),
+                    "model_used": "rule",
+                    "rationale": {"rule_hits": rule_output.get("matches", [])}
+                }
+        
+        # No predictions available - last resort
+        print("⚠ Warning: No valid predictions available, returning Unknown")
+        print(f"   Debug - rule_output: {rule_output}, tfidf_output: {tfidf_output}, bert_output: {bert_output}")
         return {
             "label": "Unknown",
             "confidence": 0.0,
@@ -274,15 +274,7 @@ class WorkflowOrchestrator:
         }
     
     def _explain_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Node 6: Build human-readable explanation.
         
-        Args:
-            state: Current state
-            
-        Returns:
-            Updated state with explanation
-        """
         fusion_result = state.get("fusion_result", {})
         policy_result = state.get("policy_result", {})
         merchant_status = state.get("merchant_status", {})
@@ -299,7 +291,7 @@ class WorkflowOrchestrator:
         return state
     
     def _build_category_explanation(self, fusion_result: Dict[str, Any]) -> str:
-        """Build category prediction explanation."""
+       
         label = fusion_result.get("label", "Unknown")
         confidence = fusion_result.get("confidence", 0.0)
         model_used = fusion_result.get("model_used", "none")
@@ -314,7 +306,7 @@ class WorkflowOrchestrator:
             return "Unable to determine category"
     
     def _build_policy_explanation(self, policy_result: Dict[str, Any]) -> str:
-        """Build policy decision explanation."""
+        
         from backend.policy_engine import format_policy_explanation
         
         action = policy_result.get("action", "allow")
@@ -326,7 +318,7 @@ class WorkflowOrchestrator:
         return format_policy_explanation(action, reasons)
     
     def _build_suggestions(self, state: Dict[str, Any]) -> list:
-        """Build actionable suggestions."""
+       
         suggestions = []
         
         merchant_status = state.get("merchant_status", {})
@@ -348,17 +340,12 @@ class WorkflowOrchestrator:
         return suggestions
 
 
-# Global orchestrator instance
+
 _orchestrator = None
 
 
 def get_orchestrator() -> WorkflowOrchestrator:
-    """
-    Get the global workflow orchestrator instance.
     
-    Returns:
-        WorkflowOrchestrator instance
-    """
     global _orchestrator
     if _orchestrator is None:
         _orchestrator = WorkflowOrchestrator()
@@ -366,15 +353,6 @@ def get_orchestrator() -> WorkflowOrchestrator:
 
 
 def run_workflow(state: Dict[str, Any], mode: Optional[str] = None) -> Dict[str, Any]:
-    """
-    Run the prepay check workflow (convenience function).
-    
-    Args:
-        state: Initial state
-        mode: Optional workflow mode override
-        
-    Returns:
-        Final state with all results
-    """
+  
     orchestrator = get_orchestrator()
     return orchestrator.run_workflow(state, mode)

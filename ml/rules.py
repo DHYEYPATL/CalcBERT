@@ -83,12 +83,23 @@ def apply_rules(text: str, meta: Optional[Dict[str, Any]] = None) -> Optional[Di
     
     text_lower = text.lower()
     
+    # Also try without word boundaries for better matching with special chars
+    # e.g., "#starbucks#" or "626starbucks765" should still match
+    text_for_fuzzy = re.sub(r'[^a-z0-9\s]', ' ', text_lower)  # Replace special chars with spaces
+    text_for_fuzzy = ' ' + text_for_fuzzy + ' '  # Add spaces for boundary matching
+    
     # Check each category's rules
     for category, patterns in RULES.items():
         matches = []
         for pattern in patterns:
+            # Try strict word boundary match first
             if re.search(pattern, text_lower, re.IGNORECASE):
                 matches.append(pattern.replace(r"\b", "").replace("?", ""))
+            else:
+                # Fallback: extract keyword and check if it exists (handles special chars)
+                keyword = pattern.replace(r"\b", "").replace("?", "").replace("\\", "")
+                if keyword in text_lower:
+                    matches.append(keyword)
         
         if matches:
             # High confidence if rule matched

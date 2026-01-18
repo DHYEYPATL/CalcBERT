@@ -86,13 +86,12 @@ const PaymentScreen = () => {
               !amount && styles.proceedDisabled,
             ]}
             disabled={!amount}
-            onPress={()=>navigation.navigate('PrepayResultScreen', {
-  merchantName,
-  upiId,
-  amount,
-  note,
-})
-}
+            onPress={() => navigation.navigate('PrepayResultScreen', {
+              merchantName,
+              upiId,
+              amount,
+              note,
+            })}
           >
             <Text style={styles.proceedText}>Proceed</Text>
           </TouchableOpacity>

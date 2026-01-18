@@ -1,17 +1,23 @@
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import React, { useEffect, useState } from 'react'
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  Alert,
+  FlatList,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
+  View,
 } from 'react-native'
-import React, { useState } from 'react'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { DEFAULT_USER_ID } from '../../constants/user'
+import { addSubscription, deleteSubscription, getSubscriptions } from '../../services/api'
 
 const SubscriptionsScreen = () => {
   const navigation = useNavigation<any>()
+
+  const userId = DEFAULT_USER_ID
 
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
@@ -25,29 +31,87 @@ const SubscriptionsScreen = () => {
       name: string
       amount: number
       cycle: 'Monthly' | 'Yearly'
+      db_id?: number
+      source?: string
     }[]
   >([])
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const addSubscription = () => {
-    if (!name || !amount) return
-
-    setSubscriptions([
-      ...subscriptions,
-      {
-        id: Date.now().toString(),
-        name,
-        amount: Number(amount),
-        cycle,
-      },
-    ])
-
-    setName('')
-    setAmount('')
-    setCycle('Monthly')
+  // Load subscriptions from API
+  const loadSubscriptions = async () => {
+    try {
+      setLoading(true)
+      const response = await getSubscriptions(userId)
+      if (response.status === 'ok' && response.subscriptions) {
+        const subs = response.subscriptions.map((s: any) => ({
+          id: s.id || s.name,
+          name: s.name || s.merchant,
+          amount: s.amount || 0,
+          cycle: s.period === 'yearly' ? 'Yearly' : 'Monthly',
+          db_id: s.db_id,
+          source: s.source,
+        }))
+        setSubscriptions(subs)
+      }
+    } catch (error: any) {
+      console.error('Error loading subscriptions:', error)
+      Alert.alert('Error', `Failed to load subscriptions: ${error?.message || 'Unknown error'}`)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const removeSubscription = (id: string) => {
-    setSubscriptions(subscriptions.filter(s => s.id !== id))
+  // Load on mount and when screen is focused
+  useEffect(() => {
+    loadSubscriptions()
+  }, [])
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadSubscriptions()
+    }, [])
+  )
+
+  const handleAddSubscription = async () => {
+    if (!name || !amount) {
+      Alert.alert('Validation', 'Please enter both name and amount')
+      return
+    }
+
+    try {
+      setSaving(true)
+      const period = cycle === 'Yearly' ? 'yearly' : 'monthly'
+      await addSubscription(userId, name, Number(amount), period)
+      Alert.alert('Success', 'Subscription added successfully')
+      setName('')
+      setAmount('')
+      setCycle('Monthly')
+      // Reload subscriptions
+      await loadSubscriptions()
+    } catch (error: any) {
+      console.error('Error adding subscription:', error)
+      Alert.alert('Error', `Failed to add subscription: ${error?.message || 'Unknown error'}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleRemoveSubscription = async (item: { id: string; db_id?: number; source?: string }) => {
+    // Only allow deletion of user-added subscriptions
+    if (item.source === 'user' && item.db_id) {
+      try {
+        await deleteSubscription(item.db_id, userId)
+        Alert.alert('Success', 'Subscription removed successfully')
+        // Reload subscriptions
+        await loadSubscriptions()
+      } catch (error: any) {
+        console.error('Error deleting subscription:', error)
+        Alert.alert('Error', `Failed to remove subscription: ${error?.message || 'Unknown error'}`)
+      }
+    } else {
+      Alert.alert('Info', 'Auto-detected subscriptions cannot be deleted')
+    }
   }
 
   return (
@@ -99,50 +163,61 @@ const SubscriptionsScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={styles.addButton}
-          onPress={addSubscription}
+          style={[styles.addButton, saving && styles.addButtonDisabled]}
+          onPress={handleAddSubscription}
+          disabled={saving}
         >
-          <Text style={styles.addText}>Add Subscription</Text>
+          {saving ? (
+            <ActivityIndicator color="#000" />
+          ) : (
+            <Text style={styles.addText}>Add Subscription</Text>
+          )}
         </TouchableOpacity>
       </View>
 
       {/* Subscriptions List */}
-      <FlatList
-        data={subscriptions}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.subscriptionRow}>
-            <View>
-              <Text style={styles.subName}>{item.name}</Text>
-              <Text style={styles.subCycle}>
-                {item.cycle}
-              </Text>
-            </View>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#F97316" />
+          <Text style={styles.loadingText}>Loading subscriptions...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={subscriptions}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.subscriptionRow}>
+              <View>
+                <Text style={styles.subName}>{item.name}</Text>
+                <Text style={styles.subCycle}>
+                  {item.cycle} {item.source === 'detected' && '(Auto-detected)'}
+                </Text>
+              </View>
 
-            <View style={styles.amountCol}>
-              <Text style={styles.subAmount}>
-                ₹{item.amount}
-              </Text>
-              <TouchableOpacity
-                onPress={() =>
-                  removeSubscription(item.id)
-                }
-              >
-                <Text style={styles.remove}>Remove</Text>
-              </TouchableOpacity>
+              <View style={styles.amountCol}>
+                <Text style={styles.subAmount}>
+                  ₹{item.amount}
+                </Text>
+                {item.source === 'user' && item.db_id && (
+                  <TouchableOpacity
+                    onPress={() => handleRemoveSubscription(item)}
+                  >
+                    <Text style={styles.remove}>Remove</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
-        )}
-      />
+          )}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No subscriptions yet</Text>
+          }
+        />
+      )}
 
       {/* Done */}
       <TouchableOpacity
         style={styles.doneButton}
-        onPress={() =>
-          navigation.navigate('index', {
-            subscriptions,
-          })
-        }
+        onPress={() => navigation.navigate('index')}
       >
         <Text style={styles.doneText}>Done</Text>
       </TouchableOpacity>
@@ -276,5 +351,23 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: '600',
+  },
+  addButtonDisabled: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    color: '#9CA3AF',
+    marginTop: 12,
+  },
+  emptyText: {
+    color: '#9CA3AF',
+    textAlign: 'center',
+    paddingVertical: 40,
   },
 })

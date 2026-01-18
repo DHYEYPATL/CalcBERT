@@ -41,6 +41,29 @@ def init_db() -> None:
     )
     """)
     
+    # Create payment_splits table for split payment persistence
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS payment_splits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        total_amount REAL NOT NULL,
+        splits_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    )
+    """)
+    
+    # Create subscriptions table for user-managed subscriptions
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        amount REAL NOT NULL,
+        period TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    )
+    """)
+    
     conn.commit()
     conn.close()
     print(f"Database initialized at {DB_PATH}")
@@ -229,4 +252,172 @@ def get_prepay_check_count(user_id: Optional[str] = None) -> int:
     count = c.fetchone()[0]
     conn.close()
     return count
+
+
+# ============================================================================
+# Payment Splits Storage Functions
+# ============================================================================
+
+def save_payment_split(user_id: str, total_amount: float, splits_json: str) -> int:
+    """
+    Save a payment split configuration to the database.
+    
+    Args:
+        user_id: User identifier
+        total_amount: Total amount to split
+        splits_json: JSON string of split configuration [{"label": "Food", "amount": 200}, ...]
+        
+    Returns:
+        The ID of the inserted split record
+    """
+    ts = int(time.time())
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO payment_splits 
+        (user_id, total_amount, splits_json, created_at) 
+        VALUES (?, ?, ?, ?)""",
+        (user_id, total_amount, splits_json, ts)
+    )
+    split_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return split_id
+
+
+def get_latest_payment_split(user_id: Optional[str] = None) -> Optional[Tuple]:
+    """
+    Get the most recent payment split configuration.
+    
+    Args:
+        user_id: Optional filter by user ID
+        
+    Returns:
+        Tuple with split data or None if not found
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute("SELECT * FROM payment_splits WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", (user_id,))
+    else:
+        c.execute("SELECT * FROM payment_splits ORDER BY created_at DESC LIMIT 1")
+    
+    row = c.fetchone()
+    conn.close()
+    return row
+
+
+def get_payment_splits_today(user_id: Optional[str] = None) -> List[Tuple]:
+    """
+    Get all payment splits created today.
+    
+    Args:
+        user_id: Optional filter by user ID
+        
+    Returns:
+        List of tuples with split data
+    """
+    from datetime import datetime as dt
+    today = dt.now().date()
+    today_start = int(dt.combine(today, dt.min.time()).timestamp())
+    today_end = int(dt.combine(today, dt.max.time()).timestamp())
+    
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute(
+            "SELECT * FROM payment_splits WHERE user_id = ? AND created_at >= ? AND created_at <= ? ORDER BY created_at DESC",
+            (user_id, today_start, today_end)
+        )
+    else:
+        c.execute(
+            "SELECT * FROM payment_splits WHERE created_at >= ? AND created_at <= ? ORDER BY created_at DESC",
+            (today_start, today_end)
+        )
+    
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+
+# ============================================================================
+# Subscriptions Storage Functions
+# ============================================================================
+
+def save_subscription(user_id: str, name: str, amount: float, period: str) -> int:
+    """
+    Save a user subscription to the database.
+    
+    Args:
+        user_id: User identifier
+        name: Subscription name
+        amount: Subscription amount
+        period: Billing period (monthly, yearly)
+        
+    Returns:
+        The ID of the inserted subscription record
+    """
+    ts = int(time.time())
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO subscriptions 
+        (user_id, name, amount, period, created_at) 
+        VALUES (?, ?, ?, ?, ?)""",
+        (user_id, name, amount, period, ts)
+    )
+    sub_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return sub_id
+
+
+def get_user_subscriptions(user_id: Optional[str] = None) -> List[Tuple]:
+    """
+    Get all user subscriptions from the database.
+    
+    Args:
+        user_id: Optional filter by user ID
+        
+    Returns:
+        List of tuples with subscription data (id, user_id, name, amount, period, created_at)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute("SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC", (user_id,))
+    else:
+        c.execute("SELECT * FROM subscriptions ORDER BY created_at DESC")
+    
+    rows = c.fetchall()
+    conn.close()
+    return rows
+
+
+def delete_subscription(subscription_id: int, user_id: Optional[str] = None) -> bool:
+    """
+    Delete a subscription from the database.
+    
+    Args:
+        subscription_id: Subscription ID to delete
+        user_id: Optional user ID for verification
+        
+    Returns:
+        True if deleted, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute("DELETE FROM subscriptions WHERE id = ? AND user_id = ?", (subscription_id, user_id))
+    else:
+        c.execute("DELETE FROM subscriptions WHERE id = ?", (subscription_id,))
+    
+    deleted = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 

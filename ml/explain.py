@@ -1,8 +1,10 @@
-def explain_distilbert(text, model_wrapper, top_k=3):
-   
-    tokens = model_wrapper.tokenizer.tokenize(text)
+def explain_distilbert(text, wrapper, top_k=3):
+    tokens = wrapper.tokenizer.tokenize(text)
 
-    top_tokens = [{"token": t, "score": round(1/top_k, 2)} for t in tokens[:top_k]]
+    if not tokens:
+        return []
 
-   
-    return top_tokens
+    # Prefer meaningful tokens, skip special tokens
+    filtered = [t for t in tokens if not t.startswith("##")]
+
+    return filtered[:top_k]

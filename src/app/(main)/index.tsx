@@ -4,24 +4,125 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { PieChart, LineChart } from "react-native-gifted-charts";
+import {
+  getSubscriptions,
+  getTodaySummary,
+  getTopMerchants,
+  getCorrectionsHistory,
+  getConfidenceTrend,
+  getSpendByCategory,
+  getAlerts,
+  getTodaySplits,
+} from "../../services/api";
+import { DEFAULT_USER_ID } from "../../constants/user";
 
 const DashboardScreen = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
 
-  const subscriptions = route.params?.subscriptions || [];
-  const splitData = route.params?.splitData || [];
-  const totalAmount = route.params?.totalAmount || 0;
+  const [loading, setLoading] = useState(true);
+  const [subscriptions, setSubscriptions] = useState<any[]>([]);
+  const [splitData, setSplitData] = useState<any[]>([]);
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [alerts, setAlerts] = useState<string[]>([]);
+  const [topMerchants, setTopMerchants] = useState<string[]>([]);
+  const [corrections, setCorrections] = useState<any[]>([]);
+  const [confidenceTrend, setConfidenceTrend] = useState<number[]>([]);
 
-  const alerts = [
-    "Food spending crossed ₹5,000 today",
-    "Unknown merchant detected",
-  ];
+  const userId = DEFAULT_USER_ID;
+
+  // Fetch all dashboard data from API
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Fetch all data in parallel
+      const [
+        subsRes,
+        spendRes,
+        topMerchantsRes,
+        correctionsRes,
+        trendRes,
+        alertsRes,
+        todaySplitsRes,
+      ] = await Promise.all([
+        getSubscriptions(userId),
+        getSpendByCategory(userId),
+        getTopMerchants(userId, 3),
+        getCorrectionsHistory(userId, 10),
+        getConfidenceTrend(userId, 7),
+        getAlerts(userId),
+        getTodaySplits(userId),
+      ]);
+
+      // Set subscriptions
+      if (subsRes.status === "ok" && subsRes.subscriptions) {
+        setSubscriptions(
+          subsRes.subscriptions.map((s: any) => ({
+            name: s.merchant || s.name || "Unknown",
+            amount: s.amount || 0,
+            cycle: s.period === "monthly" ? "Monthly" : s.period === "weekly" ? "Weekly" : "Monthly",
+          }))
+        );
+      }
+
+      // Set spend by category - combine today's splits with transaction data
+      // Priority: Today's splits > Transaction data
+      if (todaySplitsRes.status === "ok" && todaySplitsRes.combined_splits && todaySplitsRes.combined_splits.length > 0) {
+        // Use combined splits from today
+        setSplitData(todaySplitsRes.combined_splits || []);
+        setTotalAmount(todaySplitsRes.total_amount || 0);
+      } else if (spendRes.status === "ok" && spendRes.split_data) {
+        // Fallback to transaction data
+        setSplitData(spendRes.split_data || []);
+        setTotalAmount(spendRes.total_amount || 0);
+      }
+
+      // Set top merchants
+      if (topMerchantsRes.status === "ok" && topMerchantsRes.merchants) {
+        setTopMerchants(
+          topMerchantsRes.merchants.map((m: any) => m.merchant)
+        );
+      }
+
+      // Set corrections
+      if (correctionsRes.status === "ok" && correctionsRes.corrections) {
+        setCorrections(correctionsRes.corrections || []);
+      }
+
+      // Set confidence trend
+      if (trendRes.status === "ok" && trendRes.values) {
+        setConfidenceTrend(trendRes.values || []);
+      }
+
+      // Set alerts
+      if (alertsRes.status === "ok" && alertsRes.alerts) {
+        setAlerts(
+          alertsRes.alerts.map((a: any) => a.message || a.type).slice(0, 5)
+        );
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch data on mount and when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchDashboardData();
+    }, [])
+  );
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const PIE_COLORS = [
     "#F97316",
@@ -42,13 +143,27 @@ const DashboardScreen = () => {
     text: item.label,
   }));
 
-  const lineData = [
-    { value: 62 },
-    { value: 68 },
-    { value: 65 },
-    { value: 75 },
-    { value: 82 },
-  ];
+  const lineData =
+    confidenceTrend.length > 0
+      ? confidenceTrend.map((v) => ({ value: v }))
+      : [
+          { value: 0 },
+          { value: 0 },
+          { value: 0 },
+          { value: 0 },
+          { value: 0 },
+        ];
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color="#F97316" />
+          <Text style={{ color: "#FFFFFF", marginTop: 16 }}>Loading dashboard...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -188,22 +303,32 @@ const DashboardScreen = () => {
           )}
         </View>
 
-        {/* Static sections */}
+        {/* Top Merchants from Database */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Top Merchants</Text>
-          <Text style={styles.listItem}>• Sharma Electronics</Text>
-          <Text style={styles.listItem}>• Uber</Text>
-          <Text style={styles.listItem}>• Swiggy</Text>
+          {topMerchants.length > 0 ? (
+            topMerchants.map((merchant, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {merchant}
+              </Text>
+            ))
+          ) : (
+            <Text style={{ color: "#9CA3AF" }}>No merchant data yet</Text>
+          )}
         </View>
 
+        {/* Corrections History from Database */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Corrections History</Text>
-          <Text style={styles.listItem}>
-            • Food → Business (₹400)
-          </Text>
-          <Text style={styles.listItem}>
-            • Travel → Personal (₹250)
-          </Text>
+          {corrections.length > 0 ? (
+            corrections.slice(0, 5).map((correction, index) => (
+              <Text key={index} style={styles.listItem}>
+                • {correction.original_text?.substring(0, 30)}... → {correction.corrected_category}
+              </Text>
+            ))
+          ) : (
+            <Text style={{ color: "#9CA3AF" }}>No corrections yet</Text>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>

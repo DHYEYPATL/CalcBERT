@@ -1,112 +1,100 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
-# dependencies
+# =============================
+# Node / Expo
+# =============================
 node_modules/
-
-# Expo
 .expo/
 dist/
 web-build/
-expo-env.d.ts
+android/
+ios/
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
-
-# Metro
+# Expo generated
 .metro-health-check*
 
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
-
-# macOS
-.DS_Store
-*.pem
-
-# local env files
-.env*.local
-
-# typescript
+# =============================
+# TypeScript
+# =============================
 *.tsbuildinfo
 
-app-example
 
-# generated native folders
-/ios
-/android
+expo-env.d.ts  <-- intentionally tracked
 
-# Ignore virtual environment
-venv/
-.env/
-
-# Ignore Python cache
-__pycache__/
-*.pyc
-
-# Ignore IDE settings
-.vscode/
-.idea/
-
-
+# =============================
+# Python
+# =============================
 __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
 *.so
-/calcBert
+*.pyc
+.ipynb_checkpoints/
 
+# Virtual environments
 venv/
 .env/
 *.env
 *.venv
+calcBert/
 
-.ipynb_checkpoints/
 
 
+# =============================
+# Databases (CRITICAL)
+# =============================
+*.db
+*.sqlite
+*.sqlite3
+
+# =============================
+# ML Artifacts (optional)
+# =============================
+saved_models/
+models/
+checkpoints/
+
+# =============================
+# Cache
+# =============================
 .cache/
 *cache*/
 
+# =============================
 # Logs
+# =============================
 *.log
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-
-
+# =============================
+# Data
+# =============================
 data/*.csv
 data/*.xlsx
 data/*.json
 data/raw/
 data/tmp/
 
-# Saved models (optional: keep only if needed)
-saved_models/
-models/
-checkpoints/
-
-# If you want to keep models, comment the above out.
-
-
+# =============================
+# OS / Editor
+# =============================
 .DS_Store
 Thumbs.db
 *.swp
 *.swo
 
-# VSCode
-.vscode/
+# VSCode (keep settings)
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 
 # PyCharm
 .idea/
 
-# -----------------------------
+# =============================
 # Build / Dist
-# -----------------------------
-dist/
+# =============================
 build/
 *.egg-info/
 *.egg

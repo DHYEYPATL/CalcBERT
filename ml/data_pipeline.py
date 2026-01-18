@@ -52,13 +52,7 @@ def normalize_series(series: pd.Series) -> pd.Series:
 
 
 def detect_low_quality_note(text: str) -> bool:
-    """
-    Flags notes that are too vague to trust.
-    Used for:
-    - risk flags
-    - confidence penalties
-    - suggested user actions
-    """
+  
     if not text:
         return True
 

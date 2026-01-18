@@ -97,6 +97,32 @@ def prepay_check(req: PrepayCheckRequest) -> PrepayCheckResponse:
         merchant_status = final_state.get("merchant_status", {})
         explanation = final_state.get("explanation", {})
         
+        # Debug: Log fusion_result to help diagnose issues
+        if not fusion_result or not fusion_result.get("label") and not fusion_result.get("final_category"):
+            print(f"⚠ Warning: fusion_result is empty or missing category keys: {fusion_result}")
+            print(f"   Available keys in final_state: {list(final_state.keys())}")
+        
+        # Extract category and confidence from fusion_result
+        # Handle both "label"/"confidence" (from workflow) and "final_category"/"final_confidence" (legacy)
+        category = (
+            fusion_result.get("final_category") or 
+            fusion_result.get("label") or 
+            "Unknown"
+        )
+        # Normalize "unknown" (lowercase) to "Unknown" for consistency
+        if category and category.lower() == "unknown":
+            category = "Unknown"
+            
+        confidence = float(
+            fusion_result.get("final_confidence") or 
+            fusion_result.get("confidence") or 
+            0.0
+        )
+        
+        # Log extracted values for debugging
+        print(f"✓ Extracted category: '{category}', confidence: {confidence}")
+        print(f"   Full fusion_result: {fusion_result}")
+        
         # Build risk flags
         risk_flags = {
             "high_amount": req.amount > 50000.0,
@@ -107,8 +133,8 @@ def prepay_check(req: PrepayCheckRequest) -> PrepayCheckResponse:
         
         # Build analysis
         analysis = AnalysisDetails(
-            final_category=fusion_result.get("label", "Unknown"),
-            final_confidence=fusion_result.get("confidence", 0.0),
+            final_category=category,
+            final_confidence=confidence,
             risk_flags=risk_flags,
             explanation=explanation,
             subscription=merchant_status.get("subscription", {

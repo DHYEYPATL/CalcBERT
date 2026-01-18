@@ -1,15 +1,18 @@
+import Slider from '@react-native-community/slider'
+import { useNavigation } from '@react-navigation/native'
+import React, { useState } from 'react'
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  FlatList,
   StyleSheet,
+  Text,
   TextInput,
   TouchableOpacity,
-  FlatList,
+  View,
 } from 'react-native'
-import React, { useState } from 'react'
-import Slider from '@react-native-community/slider'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { DEFAULT_USER_ID } from '../../constants/user'
+import { savePaymentSplit } from '../../services/api'
 
 
 const SplitPaymentScreen = () => {
@@ -18,7 +21,13 @@ const SplitPaymentScreen = () => {
   const [splits, setSplits] = useState<
     { id: string; label: string; amount: number }[]
   >([])
+  const [saving, setSaving] = useState(false)
   const navigation = useNavigation<any>()
+
+  const userId = DEFAULT_USER_ID
+
+  // Don't auto-load - let user start fresh each time
+  // User can manually load if needed via a button
 
   // 🔹 Add a new category
   const addCategory = () => {
@@ -59,7 +68,7 @@ const SplitPaymentScreen = () => {
   )
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Split Payment</Text>
 
       {/* Total Amount Input */}
@@ -133,25 +142,41 @@ const SplitPaymentScreen = () => {
         Total: ₹{usedTotal} / ₹{totalAmount}
       </Text>
       <TouchableOpacity
-  style={{
-    backgroundColor: '#F97316',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 16,
-    alignItems: 'center',
-  }}
-  onPress={() => {
-    navigation.navigate('index', {
-      splitData: splits,
-      totalAmount,
-    })
-  }}
->
-  <Text style={{ color: '#000', fontWeight: '600' }}>
-    Done
-  </Text>
-</TouchableOpacity>
-    </View>
+        style={{
+          backgroundColor: saving ? '#6B7280' : '#F97316',
+          paddingVertical: 14,
+          borderRadius: 12,
+          marginTop: 16,
+          alignItems: 'center',
+        }}
+        disabled={saving || splits.length === 0}
+        onPress={async () => {
+          try {
+            setSaving(true)
+            // Strip id field from splits before sending to API
+            const splitsForApi = splits.map(({ label, amount }) => ({ label, amount }))
+            // Save to database
+            const result = await savePaymentSplit(userId, totalAmount, splitsForApi)
+            console.log('Split saved successfully:', result)
+            // Navigate to dashboard (it will fetch from API)
+            navigation.navigate('index')
+          } catch (error: any) {
+            console.error('Error saving split:', error)
+            // Show error to user
+            alert(`Failed to save split: ${error?.message || 'Unknown error'}\n\nCheck console for details.`)
+            // Don't navigate if save fails - let user try again
+          } finally {
+            setSaving(false)
+          }
+        }}
+      >
+        {saving ? (
+          <ActivityIndicator color="#000" />
+        ) : (
+          <Text style={{ color: '#000', fontWeight: '600' }}>Done</Text>
+        )}
+      </TouchableOpacity>
+    </SafeAreaView>
   )
 }
 
