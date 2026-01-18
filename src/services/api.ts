@@ -3,7 +3,7 @@
  * Handles all API calls to the backend server
  */
 
-const BACKEND_URL = 'https://pubic-decadently-verda.ngrok-free.dev'; // Change to your backend URL
+const BACKEND_URL = 'http://localhost:8000'; // Change to your backend URL
 
 // ============================================================================
 // Original CalcBERT - Transaction Categorization
