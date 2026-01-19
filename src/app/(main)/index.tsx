@@ -10,9 +10,10 @@ import React, { useEffect, useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { PieChart, LineChart } from "react-native-gifted-charts";
+import { Ionicons, MaterialIcons, Feather } from "@expo/vector-icons";
+
 import {
   getSubscriptions,
-  getTodaySummary,
   getTopMerchants,
   getCorrectionsHistory,
   getConfidenceTrend,
@@ -36,12 +37,10 @@ const DashboardScreen = () => {
 
   const userId = DEFAULT_USER_ID;
 
-  // Fetch all dashboard data from API
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
 
-      // Fetch all data in parallel
       const [
         subsRes,
         spendRes,
@@ -60,106 +59,90 @@ const DashboardScreen = () => {
         getTodaySplits(userId),
       ]);
 
-      // Set subscriptions
       if (subsRes.status === "ok" && subsRes.subscriptions) {
         setSubscriptions(
           subsRes.subscriptions.map((s: any) => ({
             name: s.merchant || s.name || "Unknown",
             amount: s.amount || 0,
-            cycle: s.period === "monthly" ? "Monthly" : s.period === "weekly" ? "Weekly" : "Monthly",
-          }))
+            cycle:
+              s.period === "monthly"
+                ? "Monthly"
+                : s.period === "weekly"
+                  ? "Weekly"
+                  : "Yearly",
+          })),
         );
       }
 
-      // Set spend by category - combine today's splits with transaction data
-      // Priority: Today's splits > Transaction data
-      if (todaySplitsRes.status === "ok" && todaySplitsRes.combined_splits && todaySplitsRes.combined_splits.length > 0) {
-        // Use combined splits from today
-        setSplitData(todaySplitsRes.combined_splits || []);
+      if (
+        todaySplitsRes.status === "ok" &&
+        todaySplitsRes.combined_splits?.length > 0
+      ) {
+        setSplitData(todaySplitsRes.combined_splits);
         setTotalAmount(todaySplitsRes.total_amount || 0);
       } else if (spendRes.status === "ok" && spendRes.split_data) {
-        // Fallback to transaction data
-        setSplitData(spendRes.split_data || []);
+        setSplitData(spendRes.split_data);
         setTotalAmount(spendRes.total_amount || 0);
       }
 
-      // Set top merchants
-      if (topMerchantsRes.status === "ok" && topMerchantsRes.merchants) {
+      if (topMerchantsRes.status === "ok") {
         setTopMerchants(
-          topMerchantsRes.merchants.map((m: any) => m.merchant)
+          topMerchantsRes.merchants?.map((m: any) => m.merchant) || [],
         );
       }
 
-      // Set corrections
-      if (correctionsRes.status === "ok" && correctionsRes.corrections) {
+      if (correctionsRes.status === "ok") {
         setCorrections(correctionsRes.corrections || []);
       }
 
-      // Set confidence trend
-      if (trendRes.status === "ok" && trendRes.values) {
+      if (trendRes.status === "ok") {
         setConfidenceTrend(trendRes.values || []);
       }
 
-      // Set alerts
-      if (alertsRes.status === "ok" && alertsRes.alerts) {
+      if (alertsRes.status === "ok") {
         setAlerts(
-          alertsRes.alerts.map((a: any) => a.message || a.type).slice(0, 5)
+          alertsRes.alerts?.map((a: any) => a.message || a.type).slice(0, 5) ||
+            [],
         );
       }
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
+    } catch (err) {
+      console.error("Dashboard error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  // Fetch data on mount and when screen is focused
   useFocusEffect(
     React.useCallback(() => {
       fetchDashboardData();
-    }, [])
+    }, []),
   );
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  const PIE_COLORS = [
-    "#F97316",
-    "#22C55E",
-    "#3B82F6",
-    "#A855F7",
-    "#EC4899",
-    "#EAB308",
-    "#14B8A6",
-    "#F43F5E",
-    "#6366F1",
-    "#84CC16",
-  ];
+  const PIE_COLORS = ["#F97316", "#22C55E", "#3B82F6", "#A855F7", "#EC4899"];
 
   const pieData = splitData.map((item: any, index: number) => ({
     value: item.amount,
     color: PIE_COLORS[index % PIE_COLORS.length],
-    text: item.label,
+    text: `${Math.round((item.amount / totalAmount) * 100)}%`,
+    label: item.label,
+    amount: item.amount,
   }));
 
   const lineData =
     confidenceTrend.length > 0
       ? confidenceTrend.map((v) => ({ value: v }))
-      : [
-          { value: 0 },
-          { value: 0 },
-          { value: 0 },
-          { value: 0 },
-          { value: 0 },
-        ];
+      : [{ value: 0 }];
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <View style={styles.loader}>
           <ActivityIndicator size="large" color="#F97316" />
-          <Text style={{ color: "#FFFFFF", marginTop: 16 }}>Loading dashboard...</Text>
+          <Text style={styles.loaderText}>Loading dashboard...</Text>
         </View>
       </SafeAreaView>
     );
@@ -168,167 +151,231 @@ const DashboardScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
+        {/* HEADER */}
         <View style={styles.header}>
           <Text style={styles.title}>Daily Overview</Text>
           <Text style={styles.subtitle}>Your activity today</Text>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.primaryAction}
-            onPress={() => navigation.navigate("PaymentScreen")}
-          >
-            <Text style={styles.primaryText}>Pay via UPI</Text>
-          </TouchableOpacity>
+        {/* SUMMARY WIDGETS */}
+        <View style={styles.widgetRow}>
+          <View style={styles.widgetCard}>
+            <Ionicons name="wallet-outline" size={22} color="#F97316" />
+            <Text style={styles.widgetValue}>₹{totalAmount}</Text>
+            <Text style={styles.widgetLabel}>Today Spend</Text>
+          </View>
 
-          <TouchableOpacity
-            style={styles.secondaryAction}
-            onPress={() => navigation.navigate("SplitPaymentScreen")}
-          >
-            <Text style={styles.secondaryText}>Split Payment</Text>
-          </TouchableOpacity>
+          <View style={styles.widgetCard}>
+            <MaterialIcons name="autorenew" size={22} color="#22C55E" />
+            <Text style={styles.widgetValue}>{subscriptions.length}</Text>
+            <Text style={styles.widgetLabel}>Subscriptions</Text>
+          </View>
         </View>
 
-        <View style={styles.actionRow}>
+        <View style={styles.widgetRow}>
+          <View style={styles.widgetCard}>
+            <Ionicons name="warning-outline" size={22} color="#FB923C" />
+            <Text style={styles.widgetValue}>{alerts.length}</Text>
+            <Text style={styles.widgetLabel}>Alerts</Text>
+          </View>
+
+          <View style={styles.widgetCard}>
+            <Feather name="trending-up" size={22} color="#3B82F6" />
+            <Text style={styles.widgetValue}>
+              {confidenceTrend.at(-1) ?? 0}
+            </Text>
+            <Text style={styles.widgetLabel}>Confidence</Text>
+          </View>
+        </View>
+
+        {/* QUICK ACTIONS */}
+        <View style={styles.quickActionRow}>
           <TouchableOpacity
-            style={styles.primaryAction}
+            style={styles.quickAction}
+            onPress={() =>
+              navigation.navigate("QRScannerScreen", {
+                source: "HOME_UPI",
+              })
+            }
+          >
+            <Ionicons name="qr-code-outline" size={24} color="#F97316" />
+            <Text style={styles.quickText}>Pay UPI</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickAction}
+            onPress={() => navigation.navigate("TransactionHistoryScreen")}
+          >
+            <Ionicons name="time-outline" size={24} color="#F97316" />
+            <Text style={styles.quickText}>History</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quickAction}
             onPress={() => navigation.navigate("SubscriptionsScreen")}
           >
-            <Text style={styles.primaryText}>Subscriptions</Text>
+            <Ionicons name="repeat-outline" size={24} color="#F97316" />
+            <Text style={styles.quickText}>Subs</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.secondaryAction}
+          {/* <TouchableOpacity
+            style={styles.quickAction}
             onPress={() => navigation.navigate("AlertsScreen")}
           >
-            <Text style={styles.secondaryText}>Alerts</Text>
+            <Ionicons name="notifications-outline" size={24} color="#F97316" />
+            <Text style={styles.quickText}>Alerts</Text>
+          </TouchableOpacity> */}
+          <TouchableOpacity style={styles.quickAction}>
+            <Ionicons name="git-compare-outline" size={24} color="#F97316" />
+            <Text style={styles.quickText}>Split</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Alerts */}
+        {/* ALERTS */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Alerts & Warnings</Text>
-          {alerts.map((alert, index) => (
-            <View key={index} style={styles.alertRow}>
-              <Text style={styles.alertIcon}>⚠</Text>
-              <Text style={styles.alertText}>{alert}</Text>
-            </View>
-          ))}
+          {alerts.length > 0 ? (
+            alerts.map((alert, index) => (
+              <View key={index} style={styles.alertRow}>
+                <Ionicons name="alert-circle" size={18} color="#FB923C" />
+                <Text style={styles.alertText}>{alert}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.emptyText}>No alerts</Text>
+          )}
         </View>
 
-        {/* Pie Chart */}
+        {/* PIE CHART */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Today’s Spend</Text>
 
           <View style={styles.chartCenter}>
-            {splitData.length > 0 ? (
+            {pieData.length > 0 ? (
               <PieChart
                 data={pieData}
                 donut
-                radius={80}
-                innerRadius={45}
+                radius={90}
+                innerRadius={55}
+                showText
+                textColor="#FFFFFF"
+                textSize={12}
                 centerLabelComponent={() => (
-                  <Text style={styles.centerLabel}>₹{totalAmount}</Text>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={styles.centerLabel}>₹{totalAmount}</Text>
+                    <Text style={{ color: "#9CA3AF", fontSize: 12 }}>
+                      Total Spend
+                    </Text>
+                  </View>
                 )}
               />
             ) : (
-              <Text style={{ color: "#9CA3AF" }}>
-                No split data yet
-              </Text>
+              <Text style={styles.emptyText}>No data</Text>
             )}
           </View>
 
-          {/* Legend */}
-          <View style={styles.legendContainer}>
-            {splitData.map((item: any, index: number) => (
-              <View key={item.label} style={styles.legendItemRow}>
+          {/* LEGEND */}
+          <View style={{ marginTop: 16 }}>
+            {pieData.map((item, index) => (
+              <View
+                key={index}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 8,
+                }}
+              >
                 <View
-                  style={[
-                    styles.legendDot,
-                    {
-                      backgroundColor:
-                        PIE_COLORS[index % PIE_COLORS.length],
-                    },
-                  ]}
+                  style={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
+                    backgroundColor: item.color,
+                    marginRight: 8,
+                  }}
                 />
-                <Text style={styles.legendText}>{item.label}</Text>
-                <Text style={styles.legendAmount}>₹{item.amount}</Text>
+                <Text style={{ color: "#D1D5DB", flex: 1 }}>{item.label}</Text>
+                <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
+                  ₹{item.amount} ({item.text})
+                </Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Line Chart */}
+        {/* LINE CHART */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Confidence Trend</Text>
+          <Text style={{ color: "#9CA3AF", fontSize: 12, marginBottom: 8 }}>
+            Last 7 days confidence score
+          </Text>
+
           <LineChart
             data={lineData}
             thickness={3}
             color="#F97316"
-            hideDataPoints
-            hideRules
+            hideDataPoints={false}
+            dataPointsColor="#F97316"
+            dataPointsRadius={4}
+            yAxisColor="#1F2933"
+            xAxisColor="#1F2933"
+            yAxisTextStyle={{ color: "#9CA3AF", fontSize: 10 }}
+            noOfSections={4}
             isAnimated
             areaChart
             startFillColor="#F97316"
             endFillColor="#0B0B0B"
-            startOpacity={0.3}
+            startOpacity={0.25}
             endOpacity={0}
           />
+
+          <Text
+            style={{
+              color: "#22C55E",
+              marginTop: 8,
+              textAlign: "right",
+            }}
+          >
+            Current confidence: {confidenceTrend.at(-1) ?? 0}
+          </Text>
         </View>
 
-        {/* Subscriptions */}
+        {/* SUBSCRIPTIONS */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Subscriptions</Text>
           {subscriptions.length > 0 ? (
-            subscriptions.map((sub: any, index: number) => (
-              <View key={index} style={styles.subscriptionRow}>
+            subscriptions.map((sub, i) => (
+              <View key={i} style={styles.subscriptionRow}>
                 <View>
                   <Text style={styles.subName}>{sub.name}</Text>
-                  <Text style={styles.subCategory}>
-                    {sub.cycle}
-                  </Text>
+                  <Text style={styles.subCategory}>{sub.cycle}</Text>
                 </View>
-                <Text style={styles.subAmount}>
-                  ₹{sub.amount}
-                  {sub.cycle === "Monthly" ? "/mo" : "/yr"}
-                </Text>
+                <Text style={styles.subAmount}>₹{sub.amount}</Text>
               </View>
             ))
           ) : (
-            <Text style={{ color: "#9CA3AF" }}>
-              No subscriptions added
-            </Text>
+            <Text style={styles.emptyText}>No subscriptions</Text>
           )}
         </View>
 
-        {/* Top Merchants from Database */}
+        {/* TOP MERCHANTS */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Top Merchants</Text>
-          {topMerchants.length > 0 ? (
-            topMerchants.map((merchant, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {merchant}
-              </Text>
-            ))
-          ) : (
-            <Text style={{ color: "#9CA3AF" }}>No merchant data yet</Text>
-          )}
+          {topMerchants.map((m, i) => (
+            <Text key={i} style={styles.listItem}>
+              • {m}
+            </Text>
+          ))}
         </View>
 
-        {/* Corrections History from Database */}
+        {/* CORRECTIONS */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Corrections History</Text>
-          {corrections.length > 0 ? (
-            corrections.slice(0, 5).map((correction, index) => (
-              <Text key={index} style={styles.listItem}>
-                • {correction.original_text?.substring(0, 30)}... → {correction.corrected_category}
-              </Text>
-            ))
-          ) : (
-            <Text style={{ color: "#9CA3AF" }}>No corrections yet</Text>
-          )}
+          {corrections.slice(0, 5).map((c, i) => (
+            <Text key={i} style={styles.listItem}>
+              • {c.original_text?.slice(0, 30)} → {c.corrected_category}
+            </Text>
+          ))}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -337,63 +384,68 @@ const DashboardScreen = () => {
 
 export default DashboardScreen;
 
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: "#0B0B0B" },
+
+  loader: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loaderText: { color: "#fff", marginTop: 12 },
+
+  header: { padding: 16 },
+  title: { color: "#fff", fontSize: 22, fontWeight: "700" },
+  subtitle: { color: "#9CA3AF", marginTop: 4 },
+
+  widgetRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+
+  widgetCard: {
     flex: 1,
-    backgroundColor: "#0B0B0B",
+    backgroundColor: "#111827",
+    marginHorizontal: 6,
+    padding: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#1F2933",
   },
 
-  header: {
-    padding: 16,
-  },
-
-  title: {
-    color: "#FFFFFF",
-    fontSize: 22,
+  widgetValue: {
+    color: "#fff",
+    fontSize: 18,
     fontWeight: "700",
+    marginTop: 6,
   },
 
-  subtitle: {
+  widgetLabel: {
     color: "#9CA3AF",
-    fontSize: 14,
-    marginTop: 4,
+    fontSize: 12,
   },
 
-  actionRow: {
+  quickActionRow: {
     flexDirection: "row",
     paddingHorizontal: 16,
     marginBottom: 16,
   },
 
-  primaryAction: {
+  quickAction: {
     flex: 1,
-    backgroundColor: "#F97316",
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: "#111827",
+    paddingVertical: 12,
+    marginHorizontal: 6,
+    borderRadius: 14,
     alignItems: "center",
-    marginRight: 8,
-  },
-
-  primaryText: {
-    color: "#000",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  secondaryAction: {
-    flex: 1,
     borderWidth: 1,
-    borderColor: "#F97316",
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    marginLeft: 8,
+    borderColor: "#1F2933",
   },
 
-  secondaryText: {
-    color: "#F97316",
-    fontSize: 15,
-    fontWeight: "600",
+  quickText: {
+    color: "#fff",
+    fontSize: 12,
+    marginTop: 6,
   },
 
   card: {
@@ -401,13 +453,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: "#1F2933",
   },
 
   cardTitle: {
-    color: "#FFFFFF",
+    color: "#fff",
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
@@ -419,15 +471,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  alertIcon: {
-    color: "#FB923C",
-    marginRight: 8,
-    fontSize: 16,
-  },
-
   alertText: {
-    color: "#FFFFFF",
-    fontSize: 14,
+    color: "#fff",
+    marginLeft: 8,
     flex: 1,
   },
 
@@ -437,80 +483,23 @@ const styles = StyleSheet.create({
   },
 
   centerLabel: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-
-  legendRow: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginTop: 10,
-  },
-
-  legendItem: {
-    color: "#D1D5DB",
-    fontSize: 13,
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
   },
 
   subscriptionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#1F2933",
   },
 
-  subName: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "500",
-  },
+  subName: { color: "#fff", fontSize: 15 },
+  subCategory: { color: "#9CA3AF", fontSize: 12 },
+  subAmount: { color: "#F97316", fontWeight: "600" },
 
-  subCategory: {
-    color: "#9CA3AF",
-    fontSize: 13,
-    marginTop: 2,
-  },
-
-  subAmount: {
-    color: "#F97316",
-    fontSize: 15,
-    fontWeight: "600",
-  },
-
-  listItem: {
-    color: "#D1D5DB",
-    fontSize: 14,
-    marginTop: 6,
-  },
-  legendContainer: {
-    marginTop: 12,
-  },
-
-  legendItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    marginRight: 8,
-  },
-
-  legendText: {
-    color: "#D1D5DB",
-    fontSize: 14,
-    flex: 1,
-  },
-
-  legendAmount: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
+  listItem: { color: "#D1D5DB", marginTop: 6 },
+  emptyText: { color: "#9CA3AF" },
 });

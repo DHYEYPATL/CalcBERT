@@ -52,6 +52,65 @@ export async function predictTransaction(
   }
 }
 
+export const PaymentSplit = async (
+  userId: string,
+  transactionId: string,
+  totalAmount: number,
+  splits: { label: string; amount: number }[]
+) => {
+  const res = await fetch(`${BACKEND_URL}/transactions/${transactionId}/split`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: userId,
+      total_amount: totalAmount,
+      splits,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error("Failed to save split");
+  }
+
+  return await res.json();
+};
+
+
+export const getTransactions = async (userId: string) => {
+  try {
+    const response = await fetch(
+      `${BACKEND_URL}/transactions?user_id=${userId}`
+    )
+
+    if (!response.ok) {
+      throw new Error("Failed to fetch transactions")
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error("getTransactions error:", error)
+    return { transactions: [] }
+  }
+}
+
+
+export const createTransaction = async (transaction: {
+  user_id: string
+  merchant: string
+  amount: number
+  upi_id: string
+  note?: string
+}) => {
+  const res = await fetch('/transactions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(transaction),
+  })
+
+  return res.json()
+}
+
+
 // ============================================================================
 // CalcBERT v2 - Prepay Risk & Spend Intelligence
 // ============================================================================

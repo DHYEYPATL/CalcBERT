@@ -1,6 +1,6 @@
-import Slider from '@react-native-community/slider'
-import { useNavigation } from '@react-navigation/native'
-import React, { useState } from 'react'
+import Slider from "@react-native-community/slider";
+import { useNavigation, useRoute } from "@react-navigation/native";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,111 +9,115 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { DEFAULT_USER_ID } from '../../constants/user'
-import { savePaymentSplit } from '../../services/api'
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { DEFAULT_USER_ID } from "../../constants/user";
+import { PaymentSplit } from "../../services/api";
 
+type Split = { id: string; label: string; amount: number };
 
 const SplitPaymentScreen = () => {
-  const [totalAmount, setTotalAmount] = useState<number>(0)
-  const [categoryInput, setCategoryInput] = useState('')
-  const [splits, setSplits] = useState<
-    { id: string; label: string; amount: number }[]
-  >([])
-  const [saving, setSaving] = useState(false)
-  const navigation = useNavigation<any>()
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const userId = DEFAULT_USER_ID;
 
-  const userId = DEFAULT_USER_ID
+  const transaction = route.params?.transaction;
 
-  // Don't auto-load - let user start fresh each time
-  // User can manually load if needed via a button
+  const [totalAmount, setTotalAmount] = useState(0);
+  const [categoryInput, setCategoryInput] = useState("");
+  const [splits, setSplits] = useState<Split[]>([]);
+  const [saving, setSaving] = useState(false);
 
-  // 🔹 Add a new category
-  const addCategory = () => {
-    if (!categoryInput || totalAmount <= 0) return
-
-    const remaining =
-      totalAmount -
-      splits.reduce((sum, s) => sum + s.amount, 0)
-
-    const newSplit = {
-      id: Date.now().toString(),
-      label: categoryInput,
-      amount: Math.max(remaining, 0),
+  /* 🔐 Guard + Prefill */
+  useEffect(() => {
+    if (!transaction) {
+      navigation.goBack();
+      return;
     }
 
-    setSplits([...splits, newSplit])
-    setCategoryInput('')
-  }
+    setTotalAmount(transaction.amount);
 
-  // 🔹 Update slider & rebalance others
+    // ✅ Prefill existing splits if present
+    if (transaction.splits?.length) {
+      setSplits(
+        transaction.splits.map((s: any) => ({
+          id: Date.now().toString() + Math.random(),
+          label: s.label,
+          amount: s.amount,
+        }))
+      );
+    }
+  }, []);
+
+  const addCategory = () => {
+    if (!categoryInput) return;
+
+    const used = splits.reduce((s, i) => s + i.amount, 0);
+    const remaining = totalAmount - used;
+    if (remaining <= 0) return;
+
+    setSplits([
+      ...splits,
+      {
+        id: Date.now().toString(),
+        label: categoryInput,
+        amount: remaining,
+      },
+    ]);
+    setCategoryInput("");
+  };
+
   const updateSplit = (id: string, value: number) => {
-    const rounded = Math.round(value)
-
-    let updated = splits.map(s =>
+    const rounded = Math.round(value);
+    const updated = splits.map(s =>
       s.id === id ? { ...s, amount: rounded } : s
-    )
+    );
 
-    let used = updated.reduce((sum, s) => sum + s.amount, 0)
+    const used = updated.reduce((s, i) => s + i.amount, 0);
+    if (used > totalAmount) return;
 
-    if (used > totalAmount) return
+    setSplits(updated);
+  };
 
-    setSplits(updated)
-  }
-
-  const usedTotal = splits.reduce(
-    (sum, s) => sum + s.amount,
-    0
-  )
+  const usedTotal = splits.reduce((s, i) => s + i.amount, 0);
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>Split Payment</Text>
+      <Text style={styles.title}>Split • {transaction.merchant}</Text>
 
-      {/* Total Amount Input */}
+      {/* TOTAL */}
       <View style={styles.totalInputCard}>
         <Text style={styles.label}>Total Amount</Text>
         <TextInput
-          style={styles.totalInput}
-          placeholder="Enter total amount"
-          placeholderTextColor="#6B7280"
-          keyboardType="numeric"
-          value={totalAmount ? totalAmount.toString() : ''}
-          onChangeText={text =>
-            setTotalAmount(Number(text) || 0)
-          }
+          style={[styles.totalInput, { opacity: 0.6 }]}
+          value={`₹${totalAmount}`}
+          editable={false}
         />
       </View>
 
-      {/* Category Input */}
+      {/* ADD CATEGORY */}
       <View style={styles.categoryInputRow}>
         <TextInput
           style={styles.categoryInput}
-          placeholder="Enter category (e.g. Food)"
+          placeholder="Enter category"
           placeholderTextColor="#6B7280"
           value={categoryInput}
           onChangeText={setCategoryInput}
           onSubmitEditing={addCategory}
         />
-
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={addCategory}
-        >
+        <TouchableOpacity style={styles.addButton} onPress={addCategory}>
           <Text style={styles.addText}>Add</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Dynamic Category Cards */}
+      {/* SPLITS */}
       <FlatList
         data={splits}
-        keyExtractor={item => item.id}
+        keyExtractor={i => i.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <Text style={styles.cardLabel}>{item.label}</Text>
             <Text style={styles.amount}>₹{item.amount}</Text>
-
             <Slider
               minimumValue={0}
               maximumValue={totalAmount}
@@ -122,65 +126,60 @@ const SplitPaymentScreen = () => {
               minimumTrackTintColor="#F97316"
               maximumTrackTintColor="#1F2933"
               thumbTintColor="#F97316"
-              onValueChange={value =>
-                updateSplit(item.id, value)
-              }
+              onValueChange={v => updateSplit(item.id, v)}
             />
           </View>
         )}
       />
 
-      {/* Total Summary */}
       <Text
         style={[
           styles.totalSummary,
-          usedTotal === totalAmount
-            ? styles.ok
-            : styles.warn,
+          usedTotal === totalAmount ? styles.ok : styles.warn,
         ]}
       >
         Total: ₹{usedTotal} / ₹{totalAmount}
       </Text>
+
+      {/* SAVE */}
       <TouchableOpacity
-        style={{
-          backgroundColor: saving ? '#6B7280' : '#F97316',
-          paddingVertical: 14,
-          borderRadius: 12,
-          marginTop: 16,
-          alignItems: 'center',
-        }}
-        disabled={saving || splits.length === 0}
+        style={[
+          styles.saveButton,
+          (saving || usedTotal !== totalAmount) && styles.disabled,
+        ]}
+        disabled={saving || usedTotal !== totalAmount}
         onPress={async () => {
           try {
-            setSaving(true)
-            // Strip id field from splits before sending to API
-            const splitsForApi = splits.map(({ label, amount }) => ({ label, amount }))
-            // Save to database
-            const result = await savePaymentSplit(userId, totalAmount, splitsForApi)
-            console.log('Split saved successfully:', result)
-            // Navigate to dashboard (it will fetch from API)
-            navigation.navigate('index')
-          } catch (error: any) {
-            console.error('Error saving split:', error)
-            // Show error to user
-            alert(`Failed to save split: ${error?.message || 'Unknown error'}\n\nCheck console for details.`)
-            // Don't navigate if save fails - let user try again
+            setSaving(true);
+            await PaymentSplit(
+              userId,
+              transaction.id, // ✅ KEY FIX
+              totalAmount,
+              splits.map(({ label, amount }) => ({ label, amount }))
+            );
+            navigation.replace("TransactionHistoryScreen");
+          } catch {
+            alert("Failed to save split");
           } finally {
-            setSaving(false)
+            setSaving(false);
           }
         }}
       >
         {saving ? (
           <ActivityIndicator color="#000" />
         ) : (
-          <Text style={{ color: '#000', fontWeight: '600' }}>Done</Text>
+          <Text style={styles.saveText}>Done</Text>
         )}
       </TouchableOpacity>
     </SafeAreaView>
-  )
-}
+  );
+};
 
-export default SplitPaymentScreen
+export default SplitPaymentScreen;
+
+
+/* ================= STYLES ================= */
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -212,9 +211,6 @@ const styles = StyleSheet.create({
   totalInput: {
     color: '#FFFFFF',
     fontSize: 18,
-    borderBottomWidth: 2,
-    borderBottomColor: '#F97316',
-    paddingVertical: 4,
   },
 
   categoryInputRow: {
@@ -274,11 +270,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  ok: {
-    color: '#22C55E',
+  ok: { color: '#22C55E' },
+  warn: { color: '#FB923C' },
+
+  saveButton: {
+    backgroundColor: '#F97316',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 16,
+    alignItems: 'center',
   },
 
-  warn: {
-    color: '#FB923C',
+  disabled: {
+    backgroundColor: '#6B7280',
+  },
+
+  saveText: {
+    color: '#000',
+    fontWeight: '600',
   },
 })

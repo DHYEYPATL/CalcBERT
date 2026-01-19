@@ -22,7 +22,7 @@ const QRScannerScreen = () => {
       const upiId = url.searchParams.get('pa')
       const merchantName = url.searchParams.get('pn')
 
-      navigation.navigate('PaymentScreen', {
+      navigation.replace('PaymentScreen', {
         merchantName: merchantName
           ? decodeURIComponent(merchantName)
           : 'Unknown Merchant',

@@ -4,37 +4,45 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
-} from 'react-native'
-import React, { useState } from 'react'
-import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRoute, useNavigation } from '@react-navigation/native'
+} from "react-native";
+import React, { useState, useEffect } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRoute, useNavigation } from "@react-navigation/native";
 
 const PaymentScreen = () => {
-  const route = useRoute<any>()
-  const navigation = useNavigation<any>()
+  const route = useRoute<any>();
+  const navigation = useNavigation<any>();
 
-  const merchantName = route.params?.merchantName
-  const upiId = route.params?.upiId
+  const merchantName = route.params?.merchantName;
+  const upiId = route.params?.upiId;
 
-  const [amount, setAmount] = useState('')
-  const [note, setNote] = useState('')
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    if (!merchantName || !upiId) {
+      navigation.replace("QRScannerScreen");
+    }
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.iconWrapper}>
+        <TouchableOpacity
+          style={styles.iconWrapper}
+          onPress={() => navigation.navigate("QRScannerScreen")}
+        >
           <Text style={styles.iconText}>←</Text>
         </TouchableOpacity>
 
         <Text style={styles.paytext}>Pay via UPI</Text>
 
-        <TouchableOpacity
+        {/* <TouchableOpacity
           style={styles.iconWrapper}
           onPress={() => navigation.navigate('QRScannerScreen')}
         >
           <Text style={styles.iconText}>⌁</Text>
-        </TouchableOpacity>
+        </TouchableOpacity> */}
       </View>
 
       {/* Merchant + Amount + Note (Only after QR scan) */}
@@ -81,47 +89,46 @@ const PaymentScreen = () => {
       {merchantName && (
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[
-              styles.proceedButton,
-              !amount && styles.proceedDisabled,
-            ]}
+            style={[styles.proceedButton, !amount && styles.proceedDisabled]}
             disabled={!amount}
-            onPress={() => navigation.navigate('PrepayResultScreen', {
-              merchantName,
-              upiId,
-              amount,
-              note,
-            })}
+            onPress={() =>
+              navigation.navigate("PrepayResultScreen", {
+                merchantName,
+                upiId,
+                amount,
+                note,
+              })
+            }
           >
             <Text style={styles.proceedText}>Proceed</Text>
           </TouchableOpacity>
         </View>
       )}
     </SafeAreaView>
-  )
-}
+  );
+};
 
 export default PaymentScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0B0B',
+    backgroundColor: "#0B0B0B",
   },
 
   header: {
     height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#1F2933',
+    borderBottomColor: "#1F2933",
   },
 
   paytext: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     letterSpacing: 1,
   },
 
@@ -129,74 +136,74 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   iconText: {
-    color: '#F97316',
+    color: "#F97316",
     fontSize: 26,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   merchantCard: {
-    backgroundColor: '#111827',
+    backgroundColor: "#111827",
     margin: 16,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#1F2933',
+    borderColor: "#1F2933",
   },
 
   merchantName: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: "600",
   },
 
   upiText: {
-    color: '#9CA3AF',
+    color: "#9CA3AF",
     marginTop: 4,
     fontSize: 14,
   },
 
   verifiedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 12,
   },
 
   verifiedIcon: {
-    color: '#22C55E',
+    color: "#22C55E",
     marginRight: 6,
   },
 
   verifiedText: {
-    color: '#22C55E',
+    color: "#22C55E",
     fontSize: 14,
   },
 
   amountSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     marginTop: 24,
   },
 
   currency: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 36,
     marginRight: 6,
   },
 
   amountInput: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 36,
-    fontWeight: '600',
+    fontWeight: "600",
     minWidth: 120,
-    textAlign: 'center',
+    textAlign: "center",
     borderBottomWidth: 2,
-    borderBottomColor: '#F97316',
+    borderBottomColor: "#F97316",
   },
 
   noteSection: {
@@ -205,35 +212,35 @@ const styles = StyleSheet.create({
   },
 
   noteInput: {
-    backgroundColor: '#111827',
+    backgroundColor: "#111827",
     borderRadius: 10,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#FFFFFF',
+    color: "#FFFFFF",
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#1F2933',
+    borderColor: "#1F2933",
   },
 
   footer: {
-    marginTop: 'auto',
+    marginTop: "auto",
     padding: 16,
   },
 
   proceedButton: {
-    backgroundColor: '#F97316',
+    backgroundColor: "#F97316",
     borderRadius: 14,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
   },
 
   proceedDisabled: {
-    backgroundColor: '#6B7280',
+    backgroundColor: "#6B7280",
   },
 
   proceedText: {
-    color: '#000',
+    color: "#000",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
   },
-})
+});
