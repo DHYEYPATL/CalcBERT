@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     USE_PINECONE: bool = False  # Auto-detected based on API key
     
     # v2 Backend: LangGraph Workflow Configuration
-    LANGGRAPH_ENABLED: bool = False  # Set True if LangGraph is installed
-    WORKFLOW_MODE: str = "sequential"  # 'sequential' or 'langgraph'
+    LANGGRAPH_ENABLED: bool = True  # LangGraph is now installed and implemented
+    WORKFLOW_MODE: str = "langgraph"  # 'sequential' or 'langgraph'
     
     # v2 Backend: Policy Engine Configuration
     EMPLOYEE_ALCOHOL_BLOCK: bool = True

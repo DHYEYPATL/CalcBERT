@@ -11,10 +11,14 @@ import backend.vector_store as vector_store
 
 # Try to import LangGraph (optional)
 try:
-    from langgraph.graph import Graph
+    from langgraph.graph import StateGraph, END
+    from typing_extensions import TypedDict
     LANGGRAPH_AVAILABLE = True
 except ImportError:
     LANGGRAPH_AVAILABLE = False
+    StateGraph = None
+    END = None
+    TypedDict = None
 
 
 class WorkflowOrchestrator:
@@ -88,10 +92,73 @@ class WorkflowOrchestrator:
         Returns:
             Final state with all results
         """
-        # For now, fall back to sequential
-        # In production, this would build a LangGraph graph
-        print("ℹ LangGraph mode requested but using sequential for now")
-        return self._run_sequential_workflow(state)
+        if not LANGGRAPH_AVAILABLE:
+            print("⚠ LangGraph not available, falling back to sequential")
+            return self._run_sequential_workflow(state)
+        
+        # Define state schema for LangGraph
+        class WorkflowState(TypedDict, total=False):
+            # Input fields
+            merchant: str
+            amount: float
+            note: str
+            upi_id: str
+            user_role: str
+            user_id: str
+            date: str
+            
+            # Node outputs
+            merchant_status: Dict[str, Any]
+            tfidf_output: Optional[Dict[str, Any]]
+            rule_output: Optional[Dict[str, Any]]
+            bert_output: Optional[Dict[str, Any]]
+            policy_result: Dict[str, Any]
+            fusion_result: Dict[str, Any]
+            explanation: Dict[str, Any]
+            final_decision: str
+        
+        # Build the graph
+        workflow = StateGraph(WorkflowState)
+        
+        # Add nodes
+        workflow.add_node("merchant_check", self._merchant_check_node)
+        workflow.add_node("tfidf_prediction", self._tfidf_node)
+        workflow.add_node("bert_prediction", self._bert_node)
+        workflow.add_node("policy_check", self._policy_node)
+        workflow.add_node("fusion", self._fusion_node)
+        workflow.add_node("explain", self._explain_node)
+        
+        # Define edges
+        workflow.set_entry_point("merchant_check")
+        workflow.add_edge("merchant_check", "tfidf_prediction")
+        
+        # Conditional edge: only run BERT if available
+        def should_run_bert(state: WorkflowState) -> str:
+            if self.model_adapter.distil is not None:
+                return "bert_prediction"
+            else:
+                return "policy_check"
+        
+        workflow.add_conditional_edges(
+            "tfidf_prediction",
+            should_run_bert,
+            {
+                "bert_prediction": "bert_prediction",
+                "policy_check": "policy_check"
+            }
+        )
+        
+        workflow.add_edge("bert_prediction", "policy_check")
+        workflow.add_edge("policy_check", "fusion")
+        workflow.add_edge("fusion", "explain")
+        workflow.add_edge("explain", END)
+        
+        # Compile and run
+        app = workflow.compile()
+        result = app.invoke(state)
+        
+        print("✓ LangGraph workflow completed")
+        return result
     
     def _merchant_check_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
