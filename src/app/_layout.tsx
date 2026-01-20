@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { Redirect, Stack } from 'expo-router';
 
 const _layout = () => {
-    const [isLogin, setisLogin] = useState(true);
+    const [isLogin, setisLogin] = useState(false);
   return (
     <Stack screenOptions={{ headerShown: false }}>
       {isLogin && <Stack.Screen name="(main)" />}
