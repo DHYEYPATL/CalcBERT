@@ -6,7 +6,7 @@ import requests
 import json
 
 # Update this URL to match your backend
-BACKEND_URL = "http://127.0.0.1:8000"  # Change if using ngrok or different URL
+BACKEND_URL = "https://pubic-decadently-verda.ngrok-free.dev"  # Change if using ngrok or different URL
 
 def test_save_split():
     """Test saving a payment split"""

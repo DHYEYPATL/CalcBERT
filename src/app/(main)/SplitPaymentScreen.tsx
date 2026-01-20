@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DEFAULT_USER_ID } from "../../constants/user";
-import { PaymentSplit } from "../../services/api";
+import { saveTransactionSplit } from "../../services/api";
 
 type Split = { id: string; label: string; amount: number };
 
@@ -151,9 +151,9 @@ const SplitPaymentScreen = () => {
         onPress={async () => {
           try {
             setSaving(true);
-            await PaymentSplit(
+            await saveTransactionSplit(
+              Number(transaction.id),
               userId,
-              transaction.id, // ✅ KEY FIX
               totalAmount,
               splits.map(({ label, amount }) => ({ label, amount }))
             );

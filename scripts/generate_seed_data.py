@@ -6,10 +6,14 @@ Generates 3-month historical data for testing frontend analytics.
 import sqlite3
 import json
 import random
+import os
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-DB_PATH = "backend/backend_feedback.db"
+# Use path relative to project root so it works from cwd or scripts/
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
+DB_PATH = os.path.join(_PROJECT_ROOT, "backend", "backend_feedback.db")
 
 # =============================================================================
 # Data Constants
@@ -37,7 +41,8 @@ NOTES_TEMPLATES = {
 
 UPI_SUFFIXES = ["@upi", "@paytm", "@ybl", "@okhdfcbank", "@okaxis", "@oksbi"]
 
-USER_IDS = ["user_001", "user_002", "user_003", "emp_101", "emp_102", "mgr_001"]
+# user-123 matches DEFAULT_USER_ID in frontend (src/constants/user.ts)
+USER_IDS = ["user-123", "user_001", "user_002", "user_003", "emp_101", "emp_102", "mgr_001"]
 USER_ROLES = ["employee", "employee", "employee", "manager", "admin"]
 
 SUBSCRIPTIONS = [
@@ -76,15 +81,27 @@ def generate_upi_id(merchant: str) -> str:
     return f"{clean_name}{random.choice(UPI_SUFFIXES)}"
 
 def generate_analysis_json(category: str, amount: float, decision: str) -> str:
-    """Generate mock analysis JSON for prepay checks."""
+    """Generate mock analysis JSON for prepay checks. Must include final_category and final_confidence for summary/spend-by-category/confidence-trend."""
     risk_score = 0.1 if decision == "allow" else (0.5 if decision == "warn" else 0.9)
-    
+    confidence = round(random.uniform(0.75, 0.95), 2)
+
     analysis = {
         "category": category,
+        "final_category": category,
+        "confidence": confidence,
+        "final_confidence": confidence,
         "risk_score": round(risk_score + random.uniform(-0.05, 0.05), 2),
         "policy_rules_applied": ["amount_check", "merchant_allowlist", "category_policy"],
         "llm_reasoning": f"Transaction categorized as {category}. {'Normal expense.' if decision == 'allow' else 'Requires attention.' if decision == 'warn' else 'Policy violation detected.'}",
-        "confidence": round(random.uniform(0.75, 0.95), 2)
+        "risk_flags": {
+            "high_amount": amount > 50000,
+            "unverified_merchant": False,
+            "low_quality_note": False,
+            "policy_violation": decision in ("warn", "block"),
+        },
+        "subscription": {"is_subscription": False, "confidence": 0.0, "pattern": "none"},
+        "fusion_result": {"label": category, "confidence": confidence, "model_used": "seed"},
+        "policy_result": {"action": decision, "options": ["Continue", "Cancel"]},
     }
     return json.dumps(analysis)
 
@@ -121,9 +138,8 @@ def generate_feedback_data() -> List[tuple]:
         note = random.choice(NOTES_TEMPLATES[category])
         text = f"{merchant} - {note}"
         correct_label = category
-        user_id = random.choice(USER_IDS)
+        user_id = "user-123" if random.random() < 0.4 else random.choice(USER_IDS)
         created_at = random_timestamp_for_date(random.choice(dates))
-        
         data.append((text, correct_label, user_id, created_at))
     
     return data
@@ -172,16 +188,16 @@ def generate_prepay_checks_data() -> List[tuple]:
             "monthly rent", rent_date, "allow"
         ))
     
-    # Regular varied transactions
-    for _ in range(50):
+    # Regular varied transactions (weight user-123 so frontend default user sees data)
+    for i in range(50):
         category = random.choice(list(MERCHANTS.keys()))
         merchant = random.choice(MERCHANTS[category])
         note = random.choice(NOTES_TEMPLATES[category])
         amount = round(random.uniform(100, 5000), 2)
         date = random.choice(dates)
         decision = random.choice(["allow", "allow", "allow", "warn"])
-        
-        data.append(create_prepay_entry(merchant, category, amount, note, date, decision))
+        uid = "user-123" if random.random() < 0.45 else None
+        data.append(create_prepay_entry(merchant, category, amount, note, date, decision, user_id=uid))
     
     # High amount transactions (for alert testing)
     high_amounts = [45000, 52000, 68000, 75000, 48000, 55000]
@@ -207,10 +223,11 @@ def generate_prepay_checks_data() -> List[tuple]:
     
     return data
 
-def create_prepay_entry(merchant: str, category: str, amount: float, note: str, 
-                        date: datetime, decision: str) -> tuple:
-    """Helper to create a prepay check entry tuple."""
-    user_id = random.choice(USER_IDS)
+def create_prepay_entry(merchant: str, category: str, amount: float, note: str,
+                        date: datetime, decision: str, user_id: Optional[str] = None) -> tuple:
+    """Helper to create a prepay check entry tuple. Pass user_id to force (e.g. user-123 for demo)."""
+    if user_id is None:
+        user_id = random.choice(USER_IDS)
     upi_id = generate_upi_id(merchant)
     user_role = random.choice(USER_ROLES)
     date_str = date.strftime("%Y-%m-%d")
@@ -225,12 +242,11 @@ def generate_payment_splits_data() -> List[tuple]:
     dates = get_dates_for_3_months()
     
     totals = [500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 7500, 8000, 9000, 10000, 12000, 15000]
-    
-    for total in totals:
-        user_id = random.choice(USER_IDS)
+
+    for i, total in enumerate(totals):
+        user_id = "user-123" if random.random() < 0.5 else random.choice(USER_IDS)
         splits_json = generate_splits_json(float(total))
         created_at = random_timestamp_for_date(random.choice(dates))
-        
         data.append((user_id, float(total), splits_json, created_at))
     
     return data
@@ -241,9 +257,8 @@ def generate_subscriptions_data() -> List[tuple]:
     base_date = datetime.now() - timedelta(days=60)  # Started 2 months ago
     
     for sub in SUBSCRIPTIONS:
-        user_id = random.choice(USER_IDS[:3])  # Regular users have subscriptions
+        user_id = "user-123" if random.random() < 0.5 else random.choice(USER_IDS[:3])
         created_at = random_timestamp_for_date(base_date - timedelta(days=random.randint(0, 30)))
-        
         data.append((user_id, sub["name"], sub["amount"], sub["period"], created_at))
     
     return data
@@ -318,7 +333,6 @@ def main():
     print()
     
     # Initialize database (creates tables if not exist)
-    import os
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
     conn = sqlite3.connect(DB_PATH)

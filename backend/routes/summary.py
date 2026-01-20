@@ -3,7 +3,7 @@ Summary and Subscription API Routes - v2 Backend
 Provides daily summaries, subscription management, and alerts.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
@@ -15,12 +15,16 @@ router = APIRouter()
 
 
 @router.get("/today")
-def get_daily_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
+def get_daily_summary(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid")  # Backward compatibility
+) -> Dict[str, Any]:
     """
     Get daily spend summary.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         
     Returns:
         Daily summary with spend by category, confidence, etc.
@@ -28,17 +32,22 @@ def get_daily_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
     try:
         from ml.summary_builder import build_daily_summary
         
-        # Get today's transactions
-        checks = get_prepay_checks(user_id=user_id, limit=1000)
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
         
-        # Filter for today
+        # Get recent transactions (last 7 days)
+        checks = get_prepay_checks(user_id=effective_user_id, limit=1000)
+        
+        # Filter for recent period (last 7 days)
         today = datetime.now().date()
+        seven_days_ago = today - timedelta(days=7)
         today_checks = []
         
         for check in checks:
             # check[10] is created_at timestamp
             check_date = datetime.fromtimestamp(check[10]).date()
-            if check_date == today:
+            # Include checks from last 7 days
+            if check_date >= seven_days_ago:
                 today_checks.append(check)
         
         # Convert to DataFrame for summary_builder
@@ -67,11 +76,27 @@ def get_daily_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
                 "top_merchants": []
             }
         
-        # Include ALL payment splits from today (not just latest)
-        if user_id:
+        # Include ALL payment splits from recent period (last 7 days)
+        if effective_user_id:
             import json
-            from datetime import datetime as dt
-            today_splits = get_payment_splits_today(user_id=user_id)
+            import sqlite3
+            from backend.storage import DB_PATH, get_payment_splits_today
+            
+            # First try today's splits
+            today_splits = get_payment_splits_today(user_id=effective_user_id)
+            
+            # If no splits today, get recent splits (last 7 days)
+            if not today_splits:
+                seven_days_ago = int((datetime.now() - timedelta(days=7)).timestamp())
+                
+                conn = sqlite3.connect(DB_PATH)
+                c = conn.cursor()
+                c.execute(
+                    "SELECT * FROM payment_splits WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 50",
+                    (effective_user_id, seven_days_ago)
+                )
+                today_splits = c.fetchall()
+                conn.close()
             
             for split_record in today_splits:
                 # Parse splits and add to today_spend_by_category
@@ -100,12 +125,16 @@ def get_daily_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
 
 
 @router.get("/subscriptions")
-def get_subscriptions(user_id: Optional[str] = None) -> Dict[str, Any]:
+def get_subscriptions(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid")  # Backward compatibility
+) -> Dict[str, Any]:
     """
     Get subscriptions - includes both auto-detected from transactions AND user-added subscriptions.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         
     Returns:
         List of all subscriptions (detected + user-added)
@@ -113,10 +142,13 @@ def get_subscriptions(user_id: Optional[str] = None) -> Dict[str, Any]:
     try:
         from ml.subscription_detector import detect_subscription
         
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
+        
         subscriptions = []
         
         # 1. Get auto-detected subscriptions from transactions
-        checks = get_prepay_checks(user_id=user_id, limit=1000)
+        checks = get_prepay_checks(user_id=effective_user_id, limit=1000)
         
         if checks:
             df = pd.DataFrame(checks, columns=[
@@ -147,8 +179,8 @@ def get_subscriptions(user_id: Optional[str] = None) -> Dict[str, Any]:
                     })
         
         # 2. Get user-added subscriptions from database
-        if user_id:
-            user_subs = get_user_subscriptions(user_id=user_id)
+        if effective_user_id:
+            user_subs = get_user_subscriptions(user_id=effective_user_id)
             for sub in user_subs:
                 # sub: (id, user_id, name, amount, period, created_at)
                 subscriptions.append({
@@ -260,19 +292,26 @@ def remove_subscription(
 
 
 @router.get("/alerts")
-def get_alerts(user_id: Optional[str] = None) -> Dict[str, Any]:
+def get_alerts(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid")  # Backward compatibility
+) -> Dict[str, Any]:
     """
     Get spending alerts and warnings.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         
     Returns:
         List of alerts
     """
     try:
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
+        
         # Get recent transactions (last 7 days)
-        checks = get_prepay_checks(user_id=user_id, limit=1000)
+        checks = get_prepay_checks(user_id=effective_user_id, limit=1000)
         
         alerts = []
         week_ago = datetime.now() - timedelta(days=7)
@@ -354,12 +393,17 @@ def get_alerts(user_id: Optional[str] = None) -> Dict[str, Any]:
 
 
 @router.get("/top-merchants")
-def get_top_merchants(user_id: Optional[str] = None, limit: int = 5) -> Dict[str, Any]:
+def get_top_merchants(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid"),  # Backward compatibility
+    limit: int = 5
+) -> Dict[str, Any]:
     """
     Get top merchants by transaction count from database.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         limit: Number of top merchants to return
         
     Returns:
@@ -368,7 +412,10 @@ def get_top_merchants(user_id: Optional[str] = None, limit: int = 5) -> Dict[str
     try:
         from collections import Counter
         
-        checks = get_prepay_checks(user_id=user_id, limit=1000)
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
+        
+        checks = get_prepay_checks(user_id=effective_user_id, limit=1000)
         
         # Count merchants
         merchant_counts = Counter()
@@ -403,12 +450,17 @@ def get_top_merchants(user_id: Optional[str] = None, limit: int = 5) -> Dict[str
 
 
 @router.get("/corrections")
-def get_corrections_history(user_id: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
+def get_corrections_history(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid"),  # Backward compatibility
+    limit: int = 10
+) -> Dict[str, Any]:
     """
     Get manual corrections history from feedback table.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         limit: Maximum number of corrections to return
         
     Returns:
@@ -416,6 +468,9 @@ def get_corrections_history(user_id: Optional[str] = None, limit: int = 10) -> D
     """
     try:
         from backend.storage import get_feedback_samples
+        
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
         
         feedback_samples = get_feedback_samples(limit=limit)
         
@@ -441,12 +496,17 @@ def get_corrections_history(user_id: Optional[str] = None, limit: int = 10) -> D
 
 
 @router.get("/confidence-trend")
-def get_confidence_trend(user_id: Optional[str] = None, days: int = 7) -> Dict[str, Any]:
+def get_confidence_trend(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid"),  # Backward compatibility
+    days: int = 7
+) -> Dict[str, Any]:
     """
     Get confidence trend over the last N days.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         days: Number of days to analyze
         
     Returns:
@@ -457,7 +517,10 @@ def get_confidence_trend(user_id: Optional[str] = None, days: int = 7) -> Dict[s
         import json
         from collections import defaultdict
         
-        checks = get_prepay_checks(user_id=user_id, limit=1000)
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
+        
+        checks = get_prepay_checks(user_id=effective_user_id, limit=1000)
         
         # Group by date
         daily_confidences = defaultdict(list)
@@ -513,73 +576,83 @@ def get_confidence_trend(user_id: Optional[str] = None, days: int = 7) -> Dict[s
 
 
 @router.get("/spend-by-category")
-def get_spend_by_category(user_id: Optional[str] = None) -> Dict[str, Any]:
+def get_spend_by_category(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid"),  # Backward compatibility
+    range: str = Query("weekly", alias="range")  # daily=1, weekly=7, monthly=30
+) -> Dict[str, Any]:
     """
-    Get spend breakdown by category for today.
-    Includes both transaction data from prepay_checks AND payment splits.
-    Compatible with dashboard pie chart data format.
+    Get spend breakdown by category from DB. Supports daily, weekly, monthly.
+    Includes prepay_checks (transactions) AND payment_splits. All from DB.
     
     Args:
         user_id: Optional filter by user ID
-        
-    Returns:
-        Spend by category with amounts for chart
+        userid: Optional (backward compat)
+        range: daily (1d), weekly (7d), monthly (30d)
     """
     try:
         import json
-        from datetime import datetime as dt
+        import sqlite3
+        from backend.storage import DB_PATH
+        
+        effective_user_id = user_id or userid
+        days = 1 if range == "daily" else (7 if range == "weekly" else 30)
+        today = datetime.now().date()
+        cutoff_date = today - timedelta(days=days)
+        cutoff_ts = int(datetime.combine(cutoff_date, datetime.min.time()).timestamp())
         
         category_totals = {}
         
-        # 1. Get today's transactions from prepay_checks
-        checks = get_prepay_checks(user_id=user_id, limit=1000)
-        today = datetime.now().date()
-        today_checks = []
-        
+        # 1. Prepay checks (transactions) in range
+        checks = get_prepay_checks(user_id=effective_user_id, limit=2000)
         for check in checks:
-            check_date = datetime.fromtimestamp(check[10]).date()
-            if check_date == today:
-                today_checks.append(check)
+            if check[10] < cutoff_ts:
+                continue
+            try:
+                analysis = json.loads(check[9]) if check[9] else {}
+            except Exception:
+                analysis = {}
+            cat = analysis.get("final_category") or analysis.get("category") or "Unknown"
+            amt = float(check[3])
+            category_totals[cat] = category_totals.get(cat, 0) + amt
         
-        # Group transactions by category
-        for check in today_checks:
-            analysis_json = check[9]
-            analysis = json.loads(analysis_json)
-            category = analysis.get("final_category", "Unknown")
-            amount = check[3]  # amount field
-            
-            category_totals[category] = category_totals.get(category, 0) + amount
+        # 2. Payment splits in range
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        if effective_user_id:
+            c.execute(
+                "SELECT * FROM payment_splits WHERE user_id = ? AND created_at >= ? ORDER BY created_at DESC",
+                (effective_user_id, cutoff_ts)
+            )
+        else:
+            c.execute(
+                "SELECT * FROM payment_splits WHERE created_at >= ? ORDER BY created_at DESC",
+                (cutoff_ts,)
+            )
+        rows = c.fetchall()
+        conn.close()
         
-        # 2. Include ALL payment splits from today (not just latest)
-        if user_id:
-            today_splits = get_payment_splits_today(user_id=user_id)
-            
-            for split_record in today_splits:
-                # Parse splits and add to category totals
-                splits = json.loads(split_record[3])  # splits_json field
-                for split in splits:
-                    label = split.get("label", "Unknown")
-                    amount = split.get("amount", 0)
-                    # Add to category totals (combining with transaction data)
-                    category_totals[label] = category_totals.get(label, 0) + float(amount)
+        for row in rows:
+            try:
+                spl = json.loads(row[3])
+            except Exception:
+                spl = []
+            for s in spl:
+                lbl = s.get("label", "Unknown")
+                amt = float(s.get("amount", 0))
+                category_totals[lbl] = category_totals.get(lbl, 0) + amt
         
-        # Format for dashboard (same format as splitData)
-        split_data = [
-            {"label": cat, "amount": float(total)}
-            for cat, total in category_totals.items()
-        ]
-        
+        split_data = [{"label": k, "amount": float(v)} for k, v in category_totals.items()]
         total_amount = sum(category_totals.values())
         
         return {
             "status": "ok",
             "split_data": split_data,
             "total_amount": float(total_amount),
-            "categories": list(category_totals.keys())
+            "categories": list(category_totals.keys()),
+            "range": range,
+            "days": days,
         }
         
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get spend by category: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to get spend by category: {str(e)}")

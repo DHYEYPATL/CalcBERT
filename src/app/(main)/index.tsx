@@ -19,7 +19,6 @@ import {
   getConfidenceTrend,
   getSpendByCategory,
   getAlerts,
-  getTodaySplits,
 } from "../../services/api";
 import { DEFAULT_USER_ID } from "../../constants/user";
 
@@ -34,6 +33,7 @@ const DashboardScreen = () => {
   const [topMerchants, setTopMerchants] = useState<string[]>([]);
   const [corrections, setCorrections] = useState<any[]>([]);
   const [confidenceTrend, setConfidenceTrend] = useState<number[]>([]);
+  const [range, setRange] = useState<"daily" | "weekly" | "monthly">("weekly");
 
   const userId = DEFAULT_USER_ID;
 
@@ -48,15 +48,13 @@ const DashboardScreen = () => {
         correctionsRes,
         trendRes,
         alertsRes,
-        todaySplitsRes,
       ] = await Promise.all([
         getSubscriptions(userId),
-        getSpendByCategory(userId),
+        getSpendByCategory(userId, range),
         getTopMerchants(userId, 3),
         getCorrectionsHistory(userId, 10),
         getConfidenceTrend(userId, 7),
         getAlerts(userId),
-        getTodaySplits(userId),
       ]);
 
       if (subsRes.status === "ok" && subsRes.subscriptions) {
@@ -74,15 +72,12 @@ const DashboardScreen = () => {
         );
       }
 
-      if (
-        todaySplitsRes.status === "ok" &&
-        todaySplitsRes.combined_splits?.length > 0
-      ) {
-        setSplitData(todaySplitsRes.combined_splits);
-        setTotalAmount(todaySplitsRes.total_amount || 0);
-      } else if (spendRes.status === "ok" && spendRes.split_data) {
+      if (spendRes.status === "ok" && spendRes.split_data) {
         setSplitData(spendRes.split_data);
         setTotalAmount(spendRes.total_amount || 0);
+      } else {
+        setSplitData([]);
+        setTotalAmount(0);
       }
 
       if (topMerchantsRes.status === "ok") {
@@ -115,12 +110,12 @@ const DashboardScreen = () => {
   useFocusEffect(
     React.useCallback(() => {
       fetchDashboardData();
-    }, []),
+    }, [range]),
   );
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [range]);
 
   const PIE_COLORS = ["#F97316", "#22C55E", "#3B82F6", "#A855F7", "#EC4899"];
 
@@ -162,7 +157,7 @@ const DashboardScreen = () => {
           <View style={styles.widgetCard}>
             <Ionicons name="wallet-outline" size={22} color="#F97316" />
             <Text style={styles.widgetValue}>₹{totalAmount}</Text>
-            <Text style={styles.widgetLabel}>Today Spend</Text>
+            <Text style={styles.widgetLabel}>{range === "daily" ? "Today" : range === "weekly" ? "7d" : "30d"} Spend</Text>
           </View>
 
           <View style={styles.widgetCard}>
@@ -190,42 +185,19 @@ const DashboardScreen = () => {
 
         {/* QUICK ACTIONS */}
         <View style={styles.quickActionRow}>
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() =>
-              navigation.navigate("QRScannerScreen", {
-                source: "HOME_UPI",
-              })
-            }
-          >
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("QRScannerScreen", { source: "HOME_UPI" })}>
             <Ionicons name="qr-code-outline" size={24} color="#F97316" />
             <Text style={styles.quickText}>Pay UPI</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate("TransactionHistoryScreen")}
-          >
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("TransactionHistoryScreen")}>
             <Ionicons name="time-outline" size={24} color="#F97316" />
             <Text style={styles.quickText}>History</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate("SubscriptionsScreen")}
-          >
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("SubscriptionsScreen")}>
             <Ionicons name="repeat-outline" size={24} color="#F97316" />
             <Text style={styles.quickText}>Subs</Text>
           </TouchableOpacity>
-
-          {/* <TouchableOpacity
-            style={styles.quickAction}
-            onPress={() => navigation.navigate("AlertsScreen")}
-          >
-            <Ionicons name="notifications-outline" size={24} color="#F97316" />
-            <Text style={styles.quickText}>Alerts</Text>
-          </TouchableOpacity> */}
-          <TouchableOpacity style={styles.quickAction}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("TransactionHistoryScreen")}>
             <Ionicons name="git-compare-outline" size={24} color="#F97316" />
             <Text style={styles.quickText}>Split</Text>
           </TouchableOpacity>
@@ -246,12 +218,28 @@ const DashboardScreen = () => {
           )}
         </View>
 
-        {/* PIE CHART */}
+        {/* RANGE TABS */}
+        <View style={styles.rangeRow}>
+          {(["daily", "weekly", "monthly"] as const).map((r) => (
+            <TouchableOpacity
+              key={r}
+              style={[styles.rangeTab, range === r && styles.rangeTabActive]}
+              onPress={() => setRange(r)}
+            >
+              <Text style={[styles.rangeTabText, range === r && styles.rangeTabTextActive]}>{r.charAt(0).toUpperCase() + r.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* PIE CHART - Spend by Category (from DB) */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Today’s Spend</Text>
+          <Text style={styles.cardTitle}>Spend by Category</Text>
+          <Text style={{ color: "#9CA3AF", fontSize: 12, marginBottom: 8 }}>
+            {range === "daily" ? "Today" : range === "weekly" ? "Last 7 days" : "Last 30 days"} • from DB
+          </Text>
 
           <View style={styles.chartCenter}>
-            {pieData.length > 0 ? (
+            {pieData.length > 0 && totalAmount > 0 ? (
               <PieChart
                 data={pieData}
                 donut
@@ -263,9 +251,7 @@ const DashboardScreen = () => {
                 centerLabelComponent={() => (
                   <View style={{ alignItems: "center" }}>
                     <Text style={styles.centerLabel}>₹{totalAmount}</Text>
-                    <Text style={{ color: "#9CA3AF", fontSize: 12 }}>
-                      Total Spend
-                    </Text>
+                    <Text style={{ color: "#9CA3AF", fontSize: 12 }}>Total</Text>
                   </View>
                 )}
               />
@@ -275,32 +261,17 @@ const DashboardScreen = () => {
           </View>
 
           {/* LEGEND */}
-          <View style={{ marginTop: 16 }}>
-            {pieData.map((item, index) => (
-              <View
-                key={index}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: item.color,
-                    marginRight: 8,
-                  }}
-                />
-                <Text style={{ color: "#D1D5DB", flex: 1 }}>{item.label}</Text>
-                <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>
-                  ₹{item.amount} ({item.text})
-                </Text>
-              </View>
-            ))}
-          </View>
+          {pieData.length > 0 && totalAmount > 0 && (
+            <View style={{ marginTop: 16 }}>
+              {pieData.map((item, index) => (
+                <View key={index} style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: item.color, marginRight: 8 }} />
+                  <Text style={{ color: "#D1D5DB", flex: 1 }}>{item.label}</Text>
+                  <Text style={{ color: "#FFFFFF", fontWeight: "600" }}>₹{item.amount} ({item.text})</Text>
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* LINE CHART */}
@@ -502,4 +473,9 @@ const styles = StyleSheet.create({
 
   listItem: { color: "#D1D5DB", marginTop: 6 },
   emptyText: { color: "#9CA3AF" },
+  rangeRow: { flexDirection: "row", paddingHorizontal: 16, marginBottom: 12, gap: 8 },
+  rangeTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center", backgroundColor: "#111827", borderWidth: 1, borderColor: "#1F2933" },
+  rangeTabActive: { backgroundColor: "#F97316", borderColor: "#F97316" },
+  rangeTabText: { color: "#9CA3AF", fontSize: 14, fontWeight: "600" },
+  rangeTabTextActive: { color: "#000" },
 });

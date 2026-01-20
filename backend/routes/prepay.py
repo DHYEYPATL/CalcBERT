@@ -3,7 +3,7 @@ Prepay Check API Route - v2 Backend
 Handles prepay expense approval checks with policy enforcement.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 import json
@@ -189,7 +189,8 @@ def prepay_check(req: PrepayCheckRequest) -> PrepayCheckResponse:
 
 @router.get("/history")
 def get_prepay_history(
-    user_id: Optional[str] = None,
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid"),  # Backward compatibility
     limit: int = 10
 ) -> Dict[str, Any]:
     """
@@ -197,13 +198,16 @@ def get_prepay_history(
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         limit: Maximum number of records to return
         
     Returns:
         Dictionary with history data
     """
     try:
-        checks = get_prepay_checks(user_id=user_id, limit=limit)
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
+        checks = get_prepay_checks(user_id=effective_user_id, limit=limit)
         
         # Format results
         history = []
@@ -224,7 +228,7 @@ def get_prepay_history(
         return {
             "status": "ok",
             "count": len(history),
-            "total": get_prepay_check_count(user_id=user_id),
+            "total": get_prepay_check_count(user_id=effective_user_id),
             "history": history
         }
         
@@ -236,21 +240,27 @@ def get_prepay_history(
 
 
 @router.get("/stats")
-def get_prepay_stats(user_id: Optional[str] = None) -> Dict[str, Any]:
+def get_prepay_stats(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid")  # Backward compatibility
+) -> Dict[str, Any]:
     """
     Get prepay check statistics.
     
     Args:
         user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
         
     Returns:
         Dictionary with statistics
     """
     try:
-        total = get_prepay_check_count(user_id=user_id)
+        # Use user_id if provided, otherwise use userid for backward compatibility
+        effective_user_id = user_id or userid
+        total = get_prepay_check_count(user_id=effective_user_id)
         
         # Get recent checks for stats
-        checks = get_prepay_checks(user_id=user_id, limit=100)
+        checks = get_prepay_checks(user_id=effective_user_id, limit=100)
         
         # Count by decision
         decision_counts = {"allow": 0, "warn": 0, "block": 0, "allow_with_note": 0}
