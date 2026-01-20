@@ -154,33 +154,33 @@ const DashboardScreen = () => {
 
         {/* SUMMARY WIDGETS */}
         <View style={styles.widgetRow}>
-          <View style={styles.widgetCard}>
+          <TouchableOpacity style={styles.widgetCard}>
             <Ionicons name="wallet-outline" size={22} color="#F97316" />
             <Text style={styles.widgetValue}>₹{totalAmount}</Text>
             <Text style={styles.widgetLabel}>{range === "daily" ? "Today" : range === "weekly" ? "7d" : "30d"} Spend</Text>
-          </View>
+          </TouchableOpacity>
 
-          <View style={styles.widgetCard}>
+          <TouchableOpacity style={styles.widgetCard}>
             <MaterialIcons name="autorenew" size={22} color="#22C55E" />
             <Text style={styles.widgetValue}>{subscriptions.length}</Text>
             <Text style={styles.widgetLabel}>Subscriptions</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.widgetRow}>
-          <View style={styles.widgetCard}>
+          <TouchableOpacity style={styles.widgetCard} onPress={()=>navigation.navigate("AlertsScreen")}>
             <Ionicons name="warning-outline" size={22} color="#FB923C" />
             <Text style={styles.widgetValue}>{alerts.length}</Text>
             <Text style={styles.widgetLabel}>Alerts</Text>
-          </View>
+          </TouchableOpacity>
 
-          <View style={styles.widgetCard}>
+          <TouchableOpacity style={styles.widgetCard}>
             <Feather name="trending-up" size={22} color="#3B82F6" />
             <Text style={styles.widgetValue}>
               {confidenceTrend.at(-1) ?? 0}
             </Text>
             <Text style={styles.widgetLabel}>Confidence</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* QUICK ACTIONS */}
