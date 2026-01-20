@@ -11,6 +11,10 @@ const _layout = () => {
       <Stack.Screen name='PaymentScreen'/>
       <Stack.Screen name='PrepayResultScreen'/>
       <Stack.Screen name='SplitPaymentScreen' />
+      <Stack.Screen name='TransactionHistoryScreen' />
+      <Stack.Screen name='SubscriptionsScreen' />
+      <Stack.Screen name='AlertsScreen' />
+      <Stack.Screen name='SplitsViewScreen' />
     </Stack>
   )
 }

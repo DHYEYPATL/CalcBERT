@@ -9,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { DEFAULT_USER_ID } from '../../constants/user'
@@ -21,7 +22,7 @@ const SubscriptionsScreen = () => {
 
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
-  const [cycle, setCycle] = useState<'Monthly' | 'Yearly'>(
+  const [cycle, setCycle] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>(
     'Monthly'
   )
 
@@ -30,13 +31,19 @@ const SubscriptionsScreen = () => {
       id: string
       name: string
       amount: number
-      cycle: 'Monthly' | 'Yearly'
+      cycle: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly'
       db_id?: number
       source?: string
     }[]
   >([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showDetectedModal, setShowDetectedModal] = useState(false)
+  const [detectedSubscription, setDetectedSubscription] = useState<{
+    name: string
+    amount: number
+    cycle: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly'
+  } | null>(null)
 
   // Load subscriptions from API
   const loadSubscriptions = async () => {
@@ -44,15 +51,36 @@ const SubscriptionsScreen = () => {
       setLoading(true)
       const response = await getSubscriptions(userId)
       if (response.status === 'ok' && response.subscriptions) {
-        const subs = response.subscriptions.map((s: any) => ({
-          id: s.id || s.name,
-          name: s.name || s.merchant,
-          amount: s.amount || 0,
-          cycle: s.period === 'yearly' ? 'Yearly' : 'Monthly',
-          db_id: s.db_id,
-          source: s.source,
-        }))
+        const subs = response.subscriptions.map((s: any) => {
+          let cycle: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly' = 'Monthly'
+          if (s.period === 'yearly') cycle = 'Yearly'
+          else if (s.period === 'weekly') cycle = 'Weekly'
+          else if (s.period === 'daily') cycle = 'Daily'
+          else cycle = 'Monthly'
+          
+          return {
+            id: s.id || s.name,
+            name: s.name || s.merchant,
+            amount: s.amount || 0,
+            cycle,
+            db_id: s.db_id,
+            source: s.source,
+          }
+        })
         setSubscriptions(subs)
+        
+        // Check for newly detected subscriptions (not yet added by user)
+        const detected = subs.find((s: any) => s.source === 'detected' && !s.db_id)
+        if (detected) {
+          // Check if we've already shown this prompt (using AsyncStorage or similar)
+          // For now, show prompt for first detected subscription
+          setDetectedSubscription({
+            name: detected.name,
+            amount: detected.amount,
+            cycle: detected.cycle,
+          })
+          setShowDetectedModal(true)
+        }
       }
     } catch (error: any) {
       console.error('Error loading subscriptions:', error)
@@ -81,7 +109,12 @@ const SubscriptionsScreen = () => {
 
     try {
       setSaving(true)
-      const period = cycle === 'Yearly' ? 'yearly' : 'monthly'
+      let period: 'monthly' | 'yearly' | 'weekly' | 'daily' = 'monthly'
+      if (cycle === 'Yearly') period = 'yearly'
+      else if (cycle === 'Weekly') period = 'weekly'
+      else if (cycle === 'Daily') period = 'daily'
+      else period = 'monthly'
+      
       await addSubscription(userId, name, Number(amount), period)
       Alert.alert('Success', 'Subscription added successfully')
       setName('')
@@ -139,7 +172,7 @@ const SubscriptionsScreen = () => {
 
         {/* Billing Cycle */}
         <View style={styles.cycleRow}>
-          {['Monthly', 'Yearly'].map(c => (
+          {['Daily', 'Weekly', 'Monthly', 'Yearly'].map(c => (
             <TouchableOpacity
               key={c}
               style={[
@@ -147,7 +180,7 @@ const SubscriptionsScreen = () => {
                 cycle === c && styles.cycleActive,
               ]}
               onPress={() =>
-                setCycle(c as 'Monthly' | 'Yearly')
+                setCycle(c as 'Daily' | 'Weekly' | 'Monthly' | 'Yearly')
               }
             >
               <Text
@@ -221,6 +254,75 @@ const SubscriptionsScreen = () => {
       >
         <Text style={styles.doneText}>Done</Text>
       </TouchableOpacity>
+
+      {/* Detected Subscription Modal */}
+      <Modal
+        visible={showDetectedModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowDetectedModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Recurring Transaction Detected</Text>
+            <Text style={styles.modalText}>
+              We detected a recurring transaction that might be a subscription:
+            </Text>
+            {detectedSubscription && (
+              <View style={styles.detectedInfo}>
+                <Text style={styles.detectedName}>{detectedSubscription.name}</Text>
+                <Text style={styles.detectedAmount}>₹{detectedSubscription.amount}</Text>
+                <Text style={styles.detectedCycle}>{detectedSubscription.cycle}</Text>
+              </View>
+            )}
+            <Text style={styles.modalQuestion}>
+              Would you like to add this as a subscription?
+            </Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => {
+                  setShowDetectedModal(false)
+                  setDetectedSubscription(null)
+                }}
+              >
+                <Text style={styles.modalCancelText}>Skip</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalAddBtn}
+                onPress={async () => {
+                  if (detectedSubscription) {
+                    try {
+                      setSaving(true)
+                      let period: 'monthly' | 'yearly' | 'weekly' | 'daily' = 'monthly'
+                      if (detectedSubscription.cycle === 'Yearly') period = 'yearly'
+                      else if (detectedSubscription.cycle === 'Weekly') period = 'weekly'
+                      else if (detectedSubscription.cycle === 'Daily') period = 'daily'
+                      else period = 'monthly'
+                      
+                      await addSubscription(userId, detectedSubscription.name, detectedSubscription.amount, period)
+                      Alert.alert('Success', 'Subscription added successfully')
+                      setShowDetectedModal(false)
+                      setDetectedSubscription(null)
+                      await loadSubscriptions()
+                    } catch (error: any) {
+                      Alert.alert('Error', `Failed to add subscription: ${error?.message || 'Unknown error'}`)
+                    } finally {
+                      setSaving(false)
+                    }
+                  }
+                }}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#000" />
+                ) : (
+                  <Text style={styles.modalAddText}>Add Subscription</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   )
 }
@@ -369,5 +471,86 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     textAlign: 'center',
     paddingVertical: 40,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#111827',
+    margin: 20,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1F2933',
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  modalText: {
+    color: '#D1D5DB',
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  detectedInfo: {
+    backgroundColor: '#0B0B0B',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#1F2933',
+  },
+  detectedName: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  detectedAmount: {
+    color: '#F97316',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  detectedCycle: {
+    color: '#9CA3AF',
+    fontSize: 12,
+  },
+  modalQuestion: {
+    color: '#D1D5DB',
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#1F2933',
+  },
+  modalCancelText: {
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  modalAddBtn: {
+    flex: 1,
+    backgroundColor: '#F97316',
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 10,
+  },
+  modalAddText: {
+    color: '#000',
+    fontWeight: '600',
   },
 })

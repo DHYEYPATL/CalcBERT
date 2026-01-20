@@ -20,7 +20,13 @@ const LoginScreen = () => {
   const [password, setPassword] = useState("");
 
 const handleLogin = () => {
-  router.replace("/(main)");
+  // Dummy login - accept any value
+  if (email.trim() && password.trim()) {
+    router.replace("/(main)");
+  } else {
+    // Even if empty, allow login for testing
+    router.replace("/(main)");
+  }
 };
 
   return (
@@ -70,11 +76,7 @@ const handleLogin = () => {
 
           {/* LOGIN BUTTON */}
           <TouchableOpacity
-            style={[
-              styles.loginButton,
-              (!email || !password) && styles.disabled,
-            ]}
-            disabled={!email || !password}
+            style={styles.loginButton}
             onPress={handleLogin}
           >
             <Text style={styles.loginText}>Login</Text>

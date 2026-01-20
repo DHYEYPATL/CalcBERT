@@ -213,7 +213,7 @@ class AddSubscriptionRequest(BaseModel):
     user_id: str = Field(..., description="User identifier")
     name: str = Field(..., description="Subscription name")
     amount: float = Field(..., gt=0, description="Subscription amount")
-    period: str = Field(default="monthly", description="Billing period (monthly, yearly)")
+    period: str = Field(default="monthly", description="Billing period (daily, weekly, monthly, yearly)")
 
 
 @router.post("/subscriptions")
@@ -230,7 +230,7 @@ def add_subscription(req: AddSubscriptionRequest) -> Dict[str, Any]:
     try:
         # Validate period
         period = req.period.lower()
-        if period not in ["monthly", "yearly"]:
+        if period not in ["daily", "weekly", "monthly", "yearly"]:
             period = "monthly"
         
         sub_id = save_subscription(
@@ -389,6 +389,178 @@ def get_alerts(
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate alerts: {str(e)}"
+        )
+
+
+@router.get("/alert-rules")
+def get_alert_rules(
+    user_id: Optional[str] = Query(None, alias="user_id"),
+    userid: Optional[str] = Query(None, alias="userid")  # Backward compatibility
+) -> Dict[str, Any]:
+    """
+    Get user-defined alert rules.
+    
+    Args:
+        user_id: Optional filter by user ID
+        userid: Optional filter by user ID (backward compatibility)
+        
+    Returns:
+        List of alert rules
+    """
+    try:
+        from backend.storage import get_user_alert_rules
+        
+        effective_user_id = user_id or userid
+        rules = get_user_alert_rules(user_id=effective_user_id)
+        
+        alert_rules = []
+        for rule in rules:
+            # rule: (id, user_id, category, limit_amount, enabled, created_at)
+            alert_rules.append({
+                "id": rule[0],
+                "category": rule[2],
+                "limit": float(rule[3]),
+                "enabled": bool(rule[4]),
+                "created_at": rule[5]
+            })
+        
+        return {
+            "status": "ok",
+            "rules": alert_rules,
+            "count": len(alert_rules)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get alert rules: {str(e)}"
+        )
+
+
+class AddAlertRuleRequest(BaseModel):
+    """Request schema for adding alert rule."""
+    user_id: str = Field(..., description="User identifier")
+    category: str = Field(..., description="Category to monitor")
+    limit_amount: float = Field(..., gt=0, description="Spending limit")
+    enabled: bool = Field(default=True, description="Whether rule is enabled")
+
+
+@router.post("/alert-rules")
+def add_alert_rule(req: AddAlertRuleRequest) -> Dict[str, Any]:
+    """
+    Add an alert rule.
+    
+    Args:
+        req: AddAlertRuleRequest with user_id, category, limit_amount, enabled
+        
+    Returns:
+        Response with rule ID
+    """
+    try:
+        from backend.storage import save_alert_rule
+        
+        rule_id = save_alert_rule(
+            user_id=req.user_id,
+            category=req.category,
+            limit_amount=req.limit_amount,
+            enabled=req.enabled
+        )
+        
+        return {
+            "status": "ok",
+            "rule_id": rule_id,
+            "message": "Alert rule added successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to add alert rule: {str(e)}"
+        )
+
+
+@router.put("/alert-rules/{rule_id}")
+def update_alert_rule(
+    rule_id: int,
+    enabled: Optional[bool] = None,
+    limit_amount: Optional[float] = None,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Update an alert rule.
+    
+    Args:
+        rule_id: Rule ID to update
+        enabled: Optional new enabled status
+        limit_amount: Optional new limit amount
+        user_id: Optional user ID for verification
+        
+    Returns:
+        Response with update status
+    """
+    try:
+        from backend.storage import update_alert_rule
+        
+        updated = update_alert_rule(
+            rule_id=rule_id,
+            enabled=enabled,
+            limit_amount=limit_amount,
+            user_id=user_id
+        )
+        
+        if updated:
+            return {
+                "status": "ok",
+                "message": "Alert rule updated successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="Alert rule not found"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update alert rule: {str(e)}"
+        )
+
+
+@router.delete("/alert-rules/{rule_id}")
+def delete_alert_rule(
+    rule_id: int,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Delete an alert rule.
+    
+    Args:
+        rule_id: Rule ID to delete
+        user_id: Optional user ID for verification
+        
+    Returns:
+        Response with delete status
+    """
+    try:
+        from backend.storage import delete_alert_rule
+        
+        deleted = delete_alert_rule(rule_id=rule_id, user_id=user_id)
+        
+        if deleted:
+            return {
+                "status": "ok",
+                "message": "Alert rule deleted successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="Alert rule not found"
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete alert rule: {str(e)}"
         )
 
 

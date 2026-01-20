@@ -37,17 +37,40 @@ const SplitPaymentScreen = () => {
 
     setTotalAmount(transaction.amount);
 
-    // ✅ Prefill existing splits if present
-    if (transaction.splits?.length) {
-      setSplits(
-        transaction.splits.map((s: any) => ({
-          id: Date.now().toString() + Math.random(),
-          label: s.label,
-          amount: s.amount,
-        }))
-      );
-    }
+    // Check if this transaction already has splits
+    checkExistingSplits();
   }, []);
+
+  const checkExistingSplits = async () => {
+    try {
+      const response = await getTodaySplits(userId);
+      if (response.status === "ok" && response.splits) {
+        // Filter splits that might match this transaction
+        const matching = response.splits.filter((s: any) => 
+          Math.abs(s.total_amount - transaction.amount) < 0.01
+        );
+        
+        if (matching.length > 0) {
+          // Transaction already has splits - redirect to view screen
+          navigation.replace("SplitsViewScreen", { transaction });
+          return;
+        }
+      }
+
+      // ✅ Prefill existing splits if present in transaction object
+      if (transaction.splits?.length) {
+        setSplits(
+          transaction.splits.map((s: any) => ({
+            id: Date.now().toString() + Math.random(),
+            label: s.label,
+            amount: s.amount,
+          }))
+        );
+      }
+    } catch (error) {
+      console.error("Error checking existing splits:", error);
+    }
+  };
 
   const addCategory = () => {
     if (!categoryInput) return;
@@ -140,6 +163,7 @@ const SplitPaymentScreen = () => {
       >
         Total: ₹{usedTotal} / ₹{totalAmount}
       </Text>
+
 
       {/* SAVE */}
       <TouchableOpacity

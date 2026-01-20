@@ -34,8 +34,36 @@ const DashboardScreen = () => {
   const [corrections, setCorrections] = useState<any[]>([]);
   const [confidenceTrend, setConfidenceTrend] = useState<number[]>([]);
   const [range, setRange] = useState<"daily" | "weekly" | "monthly">("weekly");
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
 
   const userId = DEFAULT_USER_ID;
+
+  // Calculate date range based on selected range
+  const calculateDateRange = (r: "daily" | "weekly" | "monthly") => {
+    const today = new Date();
+    const from = new Date();
+    
+    if (r === "daily") {
+      from.setDate(today.getDate() - 1);
+    } else if (r === "weekly") {
+      from.setDate(today.getDate() - 7);
+    } else {
+      from.setMonth(today.getMonth() - 1);
+    }
+    
+    const formatDate = (d: Date) => {
+      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    };
+    
+    setDateRange({
+      from: formatDate(from),
+      to: formatDate(today),
+    });
+  };
+
+  useEffect(() => {
+    calculateDateRange(range);
+  }, [range]);
 
   const fetchDashboardData = async () => {
     try {
@@ -148,8 +176,12 @@ const DashboardScreen = () => {
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* HEADER */}
         <View style={styles.header}>
-          <Text style={styles.title}>Daily Overview</Text>
-          <Text style={styles.subtitle}>Your activity today</Text>
+          <Text style={styles.title}>
+            {range === "daily" ? "Daily" : range === "weekly" ? "Weekly" : "Monthly"} Overview
+          </Text>
+          <Text style={styles.subtitle}>
+            {dateRange.from && dateRange.to ? `${dateRange.from} - ${dateRange.to}` : "Your activity"}
+          </Text>
         </View>
 
         {/* SUMMARY WIDGETS */}
@@ -197,7 +229,7 @@ const DashboardScreen = () => {
             <Ionicons name="repeat-outline" size={24} color="#F97316" />
             <Text style={styles.quickText}>Subs</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("TransactionHistoryScreen")}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate("SplitsViewScreen")}>
             <Ionicons name="git-compare-outline" size={24} color="#F97316" />
             <Text style={styles.quickText}>Split</Text>
           </TouchableOpacity>

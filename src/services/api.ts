@@ -248,7 +248,7 @@ export async function addSubscription(
   userId: string,
   name: string,
   amount: number,
-  period: 'monthly' | 'yearly'
+  period: 'monthly' | 'yearly' | 'weekly' | 'daily'
 ) {
   console.log('➕ Adding subscription:', name, amount)
   const res = await fetch(`${BACKEND_URL}/summary/subscriptions`, {
@@ -319,6 +319,68 @@ export async function getAlerts(userId?: string) {
 
   const res = await fetch(url.toString())
   if (!res.ok) throw new Error('Alerts fetch failed')
+  return res.json()
+}
+
+export async function getAlertRules(userId?: string) {
+  console.log('📋 Loading alert rules...')
+  const url = new URL(`${BACKEND_URL}/summary/alert-rules`)
+  if (userId) url.searchParams.append('user_id', userId)
+
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error('Alert rules fetch failed')
+  return res.json()
+}
+
+export async function addAlertRule(
+  userId: string,
+  category: string,
+  limitAmount: number,
+  enabled: boolean = true
+) {
+  console.log('➕ Adding alert rule:', category, limitAmount)
+  const res = await fetch(`${BACKEND_URL}/summary/alert-rules`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      user_id: userId,
+      category,
+      limit_amount: limitAmount,
+      enabled,
+    }),
+  })
+
+  if (!res.ok) {
+    const err = await res.text()
+    throw new Error(`Add alert rule failed: ${err}`)
+  }
+  return res.json()
+}
+
+export async function updateAlertRule(
+  ruleId: number,
+  enabled?: boolean,
+  limitAmount?: number,
+  userId?: string
+) {
+  console.log('✏️ Updating alert rule:', ruleId)
+  const url = new URL(`${BACKEND_URL}/summary/alert-rules/${ruleId}`)
+  if (enabled !== undefined) url.searchParams.append('enabled', String(enabled))
+  if (limitAmount !== undefined) url.searchParams.append('limit_amount', String(limitAmount))
+  if (userId) url.searchParams.append('user_id', userId)
+
+  const res = await fetch(url.toString(), { method: 'PUT' })
+  if (!res.ok) throw new Error('Update alert rule failed')
+  return res.json()
+}
+
+export async function deleteAlertRule(ruleId: number, userId?: string) {
+  console.log('🗑️ Deleting alert rule:', ruleId)
+  let url = `${BACKEND_URL}/summary/alert-rules/${ruleId}`
+  if (userId) url += `?user_id=${userId}`
+
+  const res = await fetch(url, { method: 'DELETE' })
+  if (!res.ok) throw new Error('Failed to delete alert rule')
   return res.json()
 }
 

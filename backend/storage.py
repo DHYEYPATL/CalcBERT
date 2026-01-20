@@ -64,6 +64,18 @@ def init_db() -> None:
     )
     """)
     
+    # Create alert_rules table for user-defined alert rules
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS alert_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        limit_amount REAL NOT NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        created_at INTEGER NOT NULL
+    )
+    """)
+    
     conn.commit()
     conn.close()
     print(f"Database initialized at {DB_PATH}")
@@ -354,7 +366,7 @@ def save_subscription(user_id: str, name: str, amount: float, period: str) -> in
         user_id: User identifier
         name: Subscription name
         amount: Subscription amount
-        period: Billing period (monthly, yearly)
+        period: Billing period (daily, weekly, monthly, yearly)
         
     Returns:
         The ID of the inserted subscription record
@@ -415,6 +427,135 @@ def delete_subscription(subscription_id: int, user_id: Optional[str] = None) -> 
         c.execute("DELETE FROM subscriptions WHERE id = ? AND user_id = ?", (subscription_id, user_id))
     else:
         c.execute("DELETE FROM subscriptions WHERE id = ?", (subscription_id,))
+    
+    deleted = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+# ============================================================================
+# Alert Rules Storage Functions
+# ============================================================================
+
+def save_alert_rule(user_id: str, category: str, limit_amount: float, enabled: bool = True) -> int:
+    """
+    Save an alert rule to the database.
+    
+    Args:
+        user_id: User identifier
+        category: Category to monitor
+        limit_amount: Spending limit for the category
+        enabled: Whether the rule is enabled
+        
+    Returns:
+        The ID of the inserted alert rule record
+    """
+    ts = int(time.time())
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        """INSERT INTO alert_rules 
+        (user_id, category, limit_amount, enabled, created_at) 
+        VALUES (?, ?, ?, ?, ?)""",
+        (user_id, category, limit_amount, 1 if enabled else 0, ts)
+    )
+    rule_id = c.lastrowid
+    conn.commit()
+    conn.close()
+    return rule_id
+
+
+def get_user_alert_rules(user_id: Optional[str] = None) -> List[Tuple]:
+    """
+    Get all alert rules for a user.
+    
+    Args:
+        user_id: Optional filter by user ID
+        
+    Returns:
+        List of tuples: (id, user_id, category, limit_amount, enabled, created_at)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute(
+            "SELECT * FROM alert_rules WHERE user_id = ? ORDER BY created_at DESC",
+            (user_id,)
+        )
+    else:
+        c.execute("SELECT * FROM alert_rules ORDER BY created_at DESC")
+    
+    rules = c.fetchall()
+    conn.close()
+    return rules
+
+
+def update_alert_rule(rule_id: int, enabled: Optional[bool] = None, limit_amount: Optional[float] = None, user_id: Optional[str] = None) -> bool:
+    """
+    Update an alert rule.
+    
+    Args:
+        rule_id: Rule ID to update
+        enabled: Optional new enabled status
+        limit_amount: Optional new limit amount
+        user_id: Optional user ID for verification
+        
+    Returns:
+        True if updated, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    updates = []
+    params = []
+    
+    if enabled is not None:
+        updates.append("enabled = ?")
+        params.append(1 if enabled else 0)
+    
+    if limit_amount is not None:
+        updates.append("limit_amount = ?")
+        params.append(limit_amount)
+    
+    if not updates:
+        conn.close()
+        return False
+    
+    params.append(rule_id)
+    
+    if user_id:
+        params.append(user_id)
+        query = f"UPDATE alert_rules SET {', '.join(updates)} WHERE id = ? AND user_id = ?"
+    else:
+        query = f"UPDATE alert_rules SET {', '.join(updates)} WHERE id = ?"
+    
+    c.execute(query, params)
+    updated = c.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+
+def delete_alert_rule(rule_id: int, user_id: Optional[str] = None) -> bool:
+    """
+    Delete an alert rule.
+    
+    Args:
+        rule_id: Rule ID to delete
+        user_id: Optional user ID for verification
+        
+    Returns:
+        True if deleted, False otherwise
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    if user_id:
+        c.execute("DELETE FROM alert_rules WHERE id = ? AND user_id = ?", (rule_id, user_id))
+    else:
+        c.execute("DELETE FROM alert_rules WHERE id = ?", (rule_id,))
     
     deleted = c.rowcount > 0
     conn.commit()

@@ -1,26 +1,31 @@
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Switch,
-  Modal,
-  TextInput,
-} from "react-native";
-import React, { useState } from "react";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { DEFAULT_USER_ID } from "../../constants/user";
+import { addAlertRule, deleteAlertRule, getAlertRules, getAlerts, updateAlertRule } from "../../services/api";
 
 /* ================= TYPES ================= */
 
 type SystemAlert = {
   id: string;
   message: string;
-  severity: "LOW" | "MEDIUM" | "HIGH";
-  date: string;
+  severity: "low" | "medium" | "high";
+  date?: string;
+  type?: string;
 };
 
 type AlertRule = {
@@ -30,75 +35,131 @@ type AlertRule = {
   enabled: boolean;
 };
 
-/* ================= MOCK SYSTEM ALERTS ================= */
-
-const SYSTEM_ALERTS: SystemAlert[] = [
-  {
-    id: "a1",
-    message: "Payment made to unverified merchant (Swiggy)",
-    severity: "HIGH",
-    date: "Today • 10:32 AM",
-  },
-  {
-    id: "a2",
-    message: "High amount transaction detected (₹12,000)",
-    severity: "MEDIUM",
-    date: "Yesterday • 9:14 PM",
-  },
-  {
-    id: "a3",
-    message: "Low confidence category prediction for Amazon payment",
-    severity: "LOW",
-    date: "Yesterday • 6:40 PM",
-  },
-];
-
 const AlertsScreen = () => {
   const navigation = useNavigation<any>();
+  const userId = DEFAULT_USER_ID;
+
+  /* 🔹 System alerts from API */
+  const [systemAlerts, setSystemAlerts] = useState<SystemAlert[]>([]);
+  const [loading, setLoading] = useState(true);
 
   /* 🔹 User rules */
   const [rules, setRules] = useState<AlertRule[]>([]);
+  const [loadingRules, setLoadingRules] = useState(false);
 
   /* 🔹 Modal state */
   const [showModal, setShowModal] = useState(false);
   const [category, setCategory] = useState("");
   const [limit, setLimit] = useState(2000);
 
-  /* ================= HELPERS ================= */
+  /* ================= LOAD ALERTS ================= */
 
-  const toggleRule = (id: string) => {
-    setRules(prev =>
-      prev.map(r =>
-        r.id === id ? { ...r, enabled: !r.enabled } : r
-      )
-    );
+  const loadAlerts = async () => {
+    try {
+      setLoading(true);
+      const response = await getAlerts(userId);
+      if (response.status === "ok" && response.alerts) {
+        const alerts = response.alerts.map((a: any, index: number) => ({
+          id: a.type || `alert_${index}`,
+          message: a.message || a.type || "Alert",
+          severity: (a.severity || "low").toLowerCase() as "low" | "medium" | "high",
+          type: a.type,
+        }));
+        setSystemAlerts(alerts);
+      }
+    } catch (error) {
+      console.error("Error loading alerts:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const addRule = () => {
+  useEffect(() => {
+    loadAlerts();
+    loadRules();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadAlerts();
+      loadRules();
+    }, [])
+  );
+
+  const loadRules = async () => {
+    try {
+      setLoadingRules(true);
+      const response = await getAlertRules(userId);
+      if (response.status === "ok" && response.rules) {
+        const loadedRules = response.rules.map((r: any) => ({
+          id: String(r.id),
+          category: r.category,
+          limit: r.limit,
+          enabled: r.enabled,
+        }));
+        setRules(loadedRules);
+      }
+    } catch (error) {
+      console.error("Error loading alert rules:", error);
+    } finally {
+      setLoadingRules(false);
+    }
+  };
+
+  /* ================= HELPERS ================= */
+
+  const toggleRule = async (id: string) => {
+    const rule = rules.find(r => r.id === id);
+    if (!rule) return;
+
+    try {
+      const newEnabled = !rule.enabled;
+      await updateAlertRule(Number(id), newEnabled, undefined, userId);
+      setRules(prev =>
+        prev.map(r =>
+          r.id === id ? { ...r, enabled: newEnabled } : r
+        )
+      );
+    } catch (error) {
+      console.error("Error toggling rule:", error);
+      Alert.alert("Error", "Failed to update alert rule");
+    }
+  };
+
+  const addRule = async () => {
     if (!category.trim()) return;
 
-    setRules(prev => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        category: category.trim(),
-        limit,
-        enabled: true,
-      },
-    ]);
+    try {
+      const response = await addAlertRule(userId, category.trim(), limit, true);
+      if (response.status === "ok") {
+        await loadRules(); // Reload rules from server
+        setCategory("");
+        setLimit(2000);
+        setShowModal(false);
+      }
+    } catch (error: any) {
+      console.error("Error adding rule:", error);
+      Alert.alert("Error", error.message || "Failed to add alert rule");
+    }
+  };
 
-    setCategory("");
-    setLimit(2000);
-    setShowModal(false);
+  const removeRule = async (id: string) => {
+    try {
+      await deleteAlertRule(Number(id), userId);
+      await loadRules(); // Reload rules from server
+    } catch (error: any) {
+      console.error("Error deleting rule:", error);
+      Alert.alert("Error", error.message || "Failed to delete alert rule");
+    }
   };
 
   /* ================= RENDERERS ================= */
 
   const renderSystemAlert = ({ item }: { item: SystemAlert }) => {
     const color =
-      item.severity === "HIGH"
+      item.severity === "high"
         ? "#F43F5E"
-        : item.severity === "MEDIUM"
+        : item.severity === "medium"
         ? "#FB923C"
         : "#FACC15";
 
@@ -107,7 +168,7 @@ const AlertsScreen = () => {
         <Ionicons name="alert-circle" size={20} color={color} />
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.alertText}>{item.message}</Text>
-          <Text style={styles.alertDate}>{item.date}</Text>
+          {item.date && <Text style={styles.alertDate}>{item.date}</Text>}
         </View>
       </View>
     );
@@ -124,12 +185,20 @@ const AlertsScreen = () => {
         </Text>
       </View>
 
-      <Switch
-        value={item.enabled}
-        onValueChange={() => toggleRule(item.id)}
-        thumbColor={item.enabled ? "#F97316" : "#9CA3AF"}
-        trackColor={{ false: "#1F2933", true: "#FDBA74" }}
-      />
+      <View style={styles.ruleActions}>
+        <Switch
+          value={item.enabled}
+          onValueChange={() => toggleRule(item.id)}
+          thumbColor={item.enabled ? "#F97316" : "#9CA3AF"}
+          trackColor={{ false: "#1F2933", true: "#FDBA74" }}
+        />
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => removeRule(item.id)}
+        >
+          <Ionicons name="trash-outline" size={18} color="#FB7185" />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -144,25 +213,35 @@ const AlertsScreen = () => {
         <View style={{ width: 24 }} />
       </View>
 
-      <FlatList
-        ListHeaderComponent={
-          <>
-            {/* SYSTEM ALERTS */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Alerts & Warnings</Text>
-              {SYSTEM_ALERTS.map(alert => (
-                <View key={alert.id}>
-                  {renderSystemAlert({ item: alert })}
-                </View>
-              ))}
-            </View>
+      {loading ? (
+        <View style={styles.loader}>
+          <ActivityIndicator size="large" color="#F97316" />
+          <Text style={styles.loaderText}>Loading alerts...</Text>
+        </View>
+      ) : (
+        <FlatList
+          ListHeaderComponent={
+            <>
+              {/* SYSTEM ALERTS */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Alerts & Warnings</Text>
+                {systemAlerts.length > 0 ? (
+                  systemAlerts.map(alert => (
+                    <View key={alert.id}>
+                      {renderSystemAlert({ item: alert })}
+                    </View>
+                  ))
+                ) : (
+                  <Text style={styles.emptyText}>No alerts</Text>
+                )}
+              </View>
 
-            {/* USER RULES HEADER */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Alert Rules</Text>
-            </View>
-          </>
-        }
+              {/* USER RULES HEADER */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Alert Rules</Text>
+              </View>
+            </>
+          }
         data={rules}
         keyExtractor={item => item.id}
         renderItem={renderRule}
@@ -175,9 +254,10 @@ const AlertsScreen = () => {
             <Text style={styles.addRuleText}>Add Alert Rule</Text>
           </TouchableOpacity>
         }
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      />
+          contentContainerStyle={{ paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
       {/* ================= MODAL ================= */}
       <Modal
@@ -410,5 +490,28 @@ const styles = StyleSheet.create({
   saveText: {
     color: "#000",
     fontWeight: "600",
+  },
+  loader: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loaderText: {
+    color: "#FFFFFF",
+    marginTop: 12,
+    fontSize: 14,
+  },
+  emptyText: {
+    color: "#9CA3AF",
+    textAlign: "center",
+    paddingVertical: 20,
+  },
+  ruleActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  deleteButton: {
+    padding: 4,
   },
 });
