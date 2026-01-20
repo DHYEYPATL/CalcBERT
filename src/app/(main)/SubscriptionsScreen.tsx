@@ -22,7 +22,7 @@ const SubscriptionsScreen = () => {
 
   const [name, setName] = useState('')
   const [amount, setAmount] = useState('')
-  const [cycle, setCycle] = useState<'Daily' | 'Weekly' | 'Monthly' | 'Yearly'>(
+  const [cycle, setCycle] = useState<'Weekly' | 'Monthly' | 'Yearly'>(
     'Monthly'
   )
 
@@ -31,7 +31,7 @@ const SubscriptionsScreen = () => {
       id: string
       name: string
       amount: number
-      cycle: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly'
+      cycle: 'Weekly' | 'Monthly' | 'Yearly'
       db_id?: number
       source?: string
     }[]
@@ -42,8 +42,10 @@ const SubscriptionsScreen = () => {
   const [detectedSubscription, setDetectedSubscription] = useState<{
     name: string
     amount: number
-    cycle: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly'
+    cycle: 'Weekly' | 'Monthly' | 'Yearly'
   } | null>(null)
+
+  const [filterCycle, setFilterCycle] = useState<'All' | 'Weekly' | 'Monthly' | 'Yearly'>('All')
 
   // Load subscriptions from API
   const loadSubscriptions = async () => {
@@ -52,10 +54,9 @@ const SubscriptionsScreen = () => {
       const response = await getSubscriptions(userId)
       if (response.status === 'ok' && response.subscriptions) {
         const subs = response.subscriptions.map((s: any) => {
-          let cycle: 'Daily' | 'Weekly' | 'Monthly' | 'Yearly' = 'Monthly'
+          let cycle: 'Weekly' | 'Monthly' | 'Yearly' = 'Monthly'
           if (s.period === 'yearly') cycle = 'Yearly'
           else if (s.period === 'weekly') cycle = 'Weekly'
-          else if (s.period === 'daily') cycle = 'Daily'
           else cycle = 'Monthly'
           
           return {
@@ -109,10 +110,9 @@ const SubscriptionsScreen = () => {
 
     try {
       setSaving(true)
-      let period: 'monthly' | 'yearly' | 'weekly' | 'daily' = 'monthly'
+      let period: 'monthly' | 'yearly' | 'weekly' = 'monthly'
       if (cycle === 'Yearly') period = 'yearly'
       else if (cycle === 'Weekly') period = 'weekly'
-      else if (cycle === 'Daily') period = 'daily'
       else period = 'monthly'
       
       await addSubscription(userId, name, Number(amount), period)
@@ -172,7 +172,7 @@ const SubscriptionsScreen = () => {
 
         {/* Billing Cycle */}
         <View style={styles.cycleRow}>
-          {['Daily', 'Weekly', 'Monthly', 'Yearly'].map(c => (
+          {['Weekly', 'Monthly', 'Yearly'].map(c => (
             <TouchableOpacity
               key={c}
               style={[
@@ -180,7 +180,7 @@ const SubscriptionsScreen = () => {
                 cycle === c && styles.cycleActive,
               ]}
               onPress={() =>
-                setCycle(c as 'Daily' | 'Weekly' | 'Monthly' | 'Yearly')
+                setCycle(c as 'Weekly' | 'Monthly' | 'Yearly')
               }
             >
               <Text
@@ -208,6 +208,29 @@ const SubscriptionsScreen = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Filter Tabs */}
+      <View style={styles.filterRow}>
+        {(['All', 'Weekly', 'Monthly', 'Yearly'] as const).map(c => (
+          <TouchableOpacity
+            key={c}
+            style={[
+              styles.filterChip,
+              filterCycle === c && styles.filterChipActive,
+            ]}
+            onPress={() => setFilterCycle(c)}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                filterCycle === c && styles.filterChipTextActive,
+              ]}
+            >
+              {c}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* Subscriptions List */}
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -216,7 +239,11 @@ const SubscriptionsScreen = () => {
         </View>
       ) : (
         <FlatList
-          data={subscriptions}
+          data={
+            filterCycle === 'All'
+              ? subscriptions
+              : subscriptions.filter(s => s.cycle === filterCycle)
+          }
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <View style={styles.subscriptionRow}>
@@ -452,6 +479,33 @@ const styles = StyleSheet.create({
   doneText: {
     color: '#000',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  filterChip: {
+    borderWidth: 1,
+    borderColor: '#1F2933',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    marginRight: 8,
+    backgroundColor: '#0B0B0B',
+  },
+  filterChipActive: {
+    backgroundColor: '#F97316',
+    borderColor: '#F97316',
+  },
+  filterChipText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  filterChipTextActive: {
+    color: '#000',
     fontWeight: '600',
   },
   addButtonDisabled: {

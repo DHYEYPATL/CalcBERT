@@ -1,6 +1,6 @@
 import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
-import { createTransaction } from "../../services/api";
+import { createTransaction, getAlertRules } from "../../services/api";
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +33,9 @@ const PrepayResultScreen = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(false);
   const [submittingFeedback, setSubmittingFeedback] = useState(false);
+  const [alertRules, setAlertRules] = useState<
+    { id: number; category: string; limit: number; enabled: boolean }[]
+  >([]);
 
   useEffect(() => {
     const fetchPrepayCheck = async () => {
@@ -75,6 +78,30 @@ const PrepayResultScreen = () => {
       loadCategories();
     }
   }, [showCorrectionModal]);
+
+  // Load user-defined alert rules when result is available
+  useEffect(() => {
+    const loadAlertRules = async () => {
+      try {
+        const response = await getAlertRules(DEFAULT_USER_ID);
+        if (response.status === "ok" && response.rules) {
+          const rules = response.rules.map((r: any) => ({
+            id: r.id,
+            category: r.category,
+            limit: r.limit,
+            enabled: !!r.enabled,
+          }));
+          setAlertRules(rules);
+        }
+      } catch (err) {
+        console.error("Error loading alert rules:", err);
+      }
+    };
+
+    if (result) {
+      loadAlertRules();
+    }
+  }, [result]);
 
   const loadCategories = async () => {
     try {
@@ -146,6 +173,17 @@ const PrepayResultScreen = () => {
   if (result?.analysis.risk_flags.policy_violation) {
     riskWarnings.push("Policy violation detected");
   }
+
+  // User alert rules triggered for this transaction
+  const triggeredAlertRules =
+    result && amount
+      ? alertRules.filter(
+          (rule) =>
+            rule.enabled &&
+            rule.category.toLowerCase() === category.toLowerCase() &&
+            Number(amount) >= rule.limit,
+        )
+      : [];
 
   // ✅ FIX: derived trust score (0–10)
   const trustScore = (() => {
@@ -250,6 +288,21 @@ const PrepayResultScreen = () => {
         ))}
       </View>
 
+      {triggeredAlertRules.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>Your Alerts</Text>
+          {triggeredAlertRules.map((rule) => (
+            <View key={rule.id} style={styles.warningRow}>
+              <Text style={styles.warningIcon}>🔔</Text>
+              <Text style={styles.warningText}>
+                {category}: this payment (₹{amount}) crosses your alert limit of ₹
+                {rule.limit}.
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
+
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>Merchant Trust Status</Text>
         <Text style={styles.trustText}>Trust Score: {trustScore} / 10</Text>
@@ -268,10 +321,12 @@ const PrepayResultScreen = () => {
                 note,
               });
 
-              // Navigate to history after successful payment
-              navigation.replace("TransactionHistoryScreen");
+              // After successful payment, go back to dashboard
+              navigation.replace("index");
             } catch (e) {
-              Alert.alert("Payment Failed", "Could not complete payment");
+              console.error("Payment failed:", e);
+              // Even on failure, return to dashboard instead of blocking the user
+              navigation.replace("index");
             }
           }}
         >

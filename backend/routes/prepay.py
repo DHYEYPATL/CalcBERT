@@ -14,7 +14,12 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 from backend.langgraph_workflow import run_workflow
-from backend.storage import save_prepay_check, get_prepay_checks, get_prepay_check_count
+from backend.storage import (
+    save_prepay_check,
+    get_prepay_checks,
+    get_prepay_check_count,
+    get_feedback_for_text,
+)
 
 router = APIRouter()
 
@@ -102,7 +107,9 @@ def prepay_check(req: PrepayCheckRequest) -> PrepayCheckResponse:
             print(f"⚠ Warning: fusion_result is empty or missing category keys: {fusion_result}")
             print(f"   Available keys in final_state: {list(final_state.keys())}")
         
+        # ---------------------------------------------------------------------
         # Extract category and confidence from fusion_result
+        # ---------------------------------------------------------------------
         # Handle both "label"/"confidence" (from workflow) and "final_category"/"final_confidence" (legacy)
         category = (
             fusion_result.get("final_category") or 
@@ -118,6 +125,25 @@ def prepay_check(req: PrepayCheckRequest) -> PrepayCheckResponse:
             fusion_result.get("confidence") or 
             0.0
         )
+
+        # ---------------------------------------------------------------------
+        # 🔁 Human-in-the-loop override from feedback
+        # If user has previously corrected a similar transaction (same text),
+        # override the category with the corrected label for immediate effect.
+        # ---------------------------------------------------------------------
+        try:
+            feedback_text = f"{req.merchant} {req.note or ''}".strip()
+            fb_sample = get_feedback_for_text(feedback_text)
+            if fb_sample:
+                _, _, correct_label, _, _ = fb_sample
+                if correct_label:
+                    print(f"🧠 Feedback override: '{category}' → '{correct_label}' for text='{feedback_text}'")
+                    category = correct_label
+                    # Boost confidence when using explicit human feedback
+                    confidence = max(confidence, 0.99)
+        except Exception as fb_err:
+            # Do not fail the whole request if feedback lookup fails
+            print(f"⚠ Feedback lookup error: {fb_err}")
         
         # Log extracted values for debugging
         print(f"✓ Extracted category: '{category}', confidence: {confidence}")

@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { DEFAULT_USER_ID } from "../../constants/user";
-import { saveTransactionSplit } from "../../services/api";
+import { getTodaySplits, saveTransactionSplit } from "../../services/api";
 
 type Split = { id: string; label: string; amount: number };
 

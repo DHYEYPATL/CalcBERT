@@ -438,6 +438,27 @@ def delete_subscription(subscription_id: int, user_id: Optional[str] = None) -> 
 # Alert Rules Storage Functions
 # ============================================================================
 
+def get_feedback_for_text(text: str) -> Optional[Tuple[int, str, str, Optional[str], int]]:
+    """
+    Get the most recent feedback sample for an exact transaction text.
+
+    Args:
+        text: Transaction text used when saving feedback
+
+    Returns:
+        Tuple: (id, text, correct_label, user_id, created_at) or None
+    """
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, text, correct_label, user_id, created_at FROM feedback WHERE text = ? ORDER BY created_at DESC LIMIT 1",
+        (text,)
+    )
+    row = c.fetchone()
+    conn.close()
+    return row
+
+
 def save_alert_rule(user_id: str, category: str, limit_amount: float, enabled: bool = True) -> int:
     """
     Save an alert rule to the database.
