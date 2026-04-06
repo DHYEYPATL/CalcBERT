@@ -1,0 +1,13 @@
+{
+    "monthly_spend_forecast": {
+        "2024-05": 50000.0,
+        "2024-06": 48000.0,
+        "2024-07": 52000.0,
+        "2024-08": 58000.0
+    },
+    "subscription_growth_rate": 0.05,
+    "cash_flow_deficit_months": [
+        "2024-08"
+    ],
+    "confidence": 0.9
+}
